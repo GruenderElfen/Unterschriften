@@ -48,6 +48,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .it.sel{border-color:#2a62ff;background:rgba(42,98,255,.08)}
 .it img{display:block;width:100%;height:auto;pointer-events:none}
 .it span{display:block;white-space:nowrap;color:#0b1a4a;font-family:Helvetica,Arial,sans-serif;pointer-events:none;line-height:1}
+.slot{position:absolute;border:2px dashed #2a62ff;background:rgba(42,98,255,.10);border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.slot span{font:600 12px/1 var(--font);color:#1f4fd6;background:rgba(255,255,255,.85);padding:3px 6px;border-radius:4px;white-space:nowrap;pointer-events:none}
+.slot.next{border-style:solid;background:rgba(42,98,255,.22);animation:pulse 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.slot.next{animation:none}}
+@keyframes pulse{50%{background:rgba(42,98,255,.08)}}
 .selbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;justify-content:center;
   padding:10px max(16px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .selbar .btn{flex:1 1 0;max-width:160px}
@@ -117,10 +122,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
   </div>
   <div class="bar" id="bar" hidden>
     <div class="seg"><button id="mSig" aria-pressed="true">Unterschrift</button><button id="mTxt" aria-pressed="false">Text / Datum</button></div>
+    <button class="btn" id="nextBtn" hidden></button>
     <div class="row">
-      <span class="small muted" id="cnt" style="flex:1"></span>
-      <button class="btn sec sm" id="zOut" aria-label="Kleiner">−</button>
-      <button class="btn sec sm" id="zIn" aria-label="Größer">+</button>
+      <span class="small muted" id="cnt" style="flex:1 1 100%"></span>
+      <span class="small muted">Inhalt zoomen</span>
+      <button class="btn sec sm" id="zOut" aria-label="Inhalt verkleinern">−</button>
+      <button class="btn sec sm" id="zIn" aria-label="Inhalt vergrößern">+</button>
+      <span style="flex:1"></span>
       <button class="btn sm" id="finish">Fertig</button>
     </div>
   </div>
@@ -147,7 +155,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <div class="actions">
       <button class="btn sec" id="padClear">Löschen</button>
       <button class="btn sec" id="padCancel">Abbrechen</button>
-      <button class="btn" id="padSave">Übernehmen</button>
+      <button class="btn sec" id="padSave">Übernehmen</button>
+      <button class="btn" id="padNext" hidden>Übernehmen, nächste Zeile</button>
     </div>
   </div>
 </div>
@@ -295,7 +304,7 @@ function initAdmin(){
 }
 
 /* ============================ Kunden-Ansicht ============================ */
-const st = {bytes:null, pages:[], items:[], mode:"sig", zoom:1, sel:null, pending:null, doc:null, last:null};
+const st = {slots:[], confirmGap:false, bytes:null, pages:[], items:[], mode:"sig", zoom:1, sel:null, pending:null, doc:null, last:null};
 let uid = 0;
 
 async function initSign(d){
@@ -336,12 +345,88 @@ async function layout(){
     p.cv.width = vp.width; p.cv.height = vp.height;
     await p.page.render({canvasContext: p.cv.getContext("2d"), viewport: vp}).promise;
   }
+  if(!st.detected){ st.detected = true; try{ await detectSlots(); }catch(e){ console.warn(e); } }
   renderItems();
 }
 function pageW(pi){ return st.pages[pi].wrap.getBoundingClientRect().width; }
 
+
+/* ---- Automatische Erkennung der Unterschrift-Zeilen ---- */
+function runs(arr, minLen){ // arr: Uint8Array(0/1) -> zusammengefasste Positionen langer Linien
+  const out = []; let start = -1;
+  for(let i = 0; i <= arr.length; i++){
+    if(i < arr.length && arr[i]){ if(start < 0) start = i; }
+    else if(start >= 0){ out.push([start, i - 1]); start = -1; }
+  }
+  return out;
+}
+async function detectSlots(){
+  st.slots = [];
+  for(let pi = 0; pi < st.pages.length; pi++){
+    const p = st.pages[pi], cvp = p.cv, W = cvp.width, Hh = cvp.height;
+    const tc = await p.page.getTextContent(), vp1 = p.vp1;
+    const items = [];
+    tc.items.forEach(t => { if(!t.str || !t.str.trim()) return;
+      const pt = vp1.convertToViewportPoint(t.transform[4], t.transform[5]);
+      items.push({s: t.str, x: pt[0] / vp1.width, y: pt[1] / vp1.height, w: t.width / vp1.width, h: (t.height || 10) / vp1.height}); });
+    const hdr = [];
+    items.forEach(t => { const m = t.s.toLowerCase().indexOf("unterschrift"); if(m >= 0){
+      const L = t.s.length; hdr.push({cx: t.x + t.w * (m + 6) / L, y: t.y}); } });
+    if(!hdr.length) continue;
+    const img = cvp.getContext("2d").getImageData(0, 0, W, Hh).data;
+    const dark = (x, y) => { const i = (y * W + x) * 4; return img[i+3] > 100 && (img[i] + img[i+1] + img[i+2]) < 330; };
+    // horizontale Linien
+    const hl = [];
+    for(let y = 0; y < Hh; y++){ let best = 0, cur = 0;
+      for(let x = 0; x < W; x++){ if(dark(x, y)){ cur++; if(cur > best) best = cur; } else cur = 0; }
+      if(best > W * 0.25) hl.push(y); }
+    // vertikale Linien
+    const vl = [];
+    for(let x = 0; x < W; x++){ let best = 0, cur = 0;
+      for(let y = 0; y < Hh; y++){ if(dark(x, y)){ cur++; if(cur > best) best = cur; } else cur = 0; }
+      if(best > Hh * 0.12) vl.push(x); }
+    const merge = a => { const r = []; a.forEach(v => { if(r.length && v - r[r.length-1].e <= 4){ r[r.length-1].e = v; } else r.push({s: v, e: v}); }); return r.map(o => (o.s + o.e) / 2); };
+    const H = merge(hl), V = merge(vl);
+    if(H.length < 3 || V.length < 2) continue;
+    const h0 = hdr[0], hx = h0.cx * W, hy = h0.y * Hh;
+    let xl = null, xr = null;
+    for(let i = 0; i < V.length - 1; i++){ if(V[i] < hx && V[i+1] > hx){ xl = V[i]; xr = V[i+1]; } }
+    if(xl == null) continue;
+    // Kopfzeile: letzte Linie über dem Text; Zeilen: Linienpaare darunter
+    const rowsY = H.filter(y => y > hy);
+    if(rowsY.length < 2) continue;
+    const topLine = H.filter(y => y < hy).pop();
+    const lines = [rowsY[0], ...rowsY.slice(1)];
+    const tbl = []; let endX = xl;
+    for(let i = 0; i < lines.length - 1; i++){
+      const y0 = lines[i], y1 = lines[i+1];
+      if(y1 - y0 < Hh * 0.012) continue;
+      const rowItems = items.filter(t => t.y * Hh > y0 && t.y * Hh <= y1 + 2 && t.x * W >= V[0] - 2 && t.x * W <= V[V.length-1]);
+      if(!rowItems.length) continue;
+      rowItems.sort((a, b) => a.x - b.x);
+      rowItems.forEach(t => { if(t.x * W >= xl - 2 && t.x * W < xr) endX = Math.max(endX, (t.x + t.w) * W); });
+      const txt = rowItems.map(t => t.s.trim()).filter(x => x && x.toLowerCase() !== "x").join(" · ");
+      tbl.push({y0, y1, txt});
+    }
+    const sx0 = endX > xl ? Math.min(endX + W * 0.006, xr - W * 0.04) : xl;
+    tbl.forEach(r => st.slots.push({page: pi, x0: sx0 / W, x1: xr / W, y0: r.y0 / Hh, y1: r.y1 / Hh, text: r.txt, pw: W, ph: Hh}));
+  }
+}
+function nextSlot(){ return st.slots.findIndex((s, i) => !st.items.some(it => it.slot === i)); }
+
 function renderItems(){
-  st.pages.forEach(p => p.wrap.querySelectorAll(".it").forEach(e => e.remove()));
+  st.pages.forEach(p => p.wrap.querySelectorAll(".it,.slot").forEach(e => e.remove()));
+  const ns = nextSlot();
+  st.slots.forEach((sl, i) => {
+    if(st.items.some(it => it.slot === i)) return;
+    const el = document.createElement("div"); el.className = "slot" + (i === ns ? " next" : "");
+    el.style.left = sl.x0 * 100 + "%"; el.style.width = (sl.x1 - sl.x0) * 100 + "%";
+    el.style.top = sl.y0 * 100 + "%"; el.style.height = (sl.y1 - sl.y0) * 100 + "%";
+    const sp = document.createElement("span"); sp.textContent = "Zeile " + (i + 1) + " – hier unterschreiben"; el.append(sp);
+    el.addEventListener("click", ev => { ev.stopPropagation(); if(st.sel != null){ st.sel = null; renderItems(); return; }
+      st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); });
+    st.pages[sl.page].wrap.append(el);
+  });
   st.items.forEach(it => {
     const p = st.pages[it.page], el = document.createElement("div");
     el.className = "it" + (st.sel === it.id ? " sel" : ""); el.dataset.id = it.id;
@@ -360,7 +445,15 @@ function renderItems(){
   document.body.style.paddingBottom = st.sel == null ? "" : "90px";
   updateCount();
 }
-function updateCount(){ const s = st.items.filter(i => i.type === "sig").length; $("cnt").textContent = s ? s + (s === 1 ? " Unterschrift gesetzt" : " Unterschriften gesetzt") : "Noch keine Unterschrift"; }
+function updateCount(){
+  const s = st.items.filter(i => i.type === "sig").length;
+  if(st.slots.length){ const done = st.items.filter(i => i.slot != null).length; $("cnt").textContent = done + " von " + st.slots.length + " Zeilen unterschrieben. Tippen Sie auf das blau markierte Feld."; }
+  else $("cnt").textContent = s ? s + (s === 1 ? " Unterschrift gesetzt" : " Unterschriften gesetzt") : "Noch keine Unterschrift. Tippen Sie auf die Stelle im Dokument.";
+  st.confirmGap = false; $("finish").textContent = "Fertig";
+  const n = nextSlot(), nb = $("nextBtn");
+  nb.hidden = n < 0 || !st.slots.length;
+  if(!nb.hidden){ const dm = (st.slots[n].text || "").match(/\d{2}\.\d{2}\.\d{4}/); nb.textContent = "Zeile " + (n + 1) + " unterschreiben" + (dm ? " (" + dm[0] + ")" : ""); }
+}
 
 function startDrag(ev, it, el){
   ev.stopPropagation(); ev.preventDefault();
@@ -403,7 +496,9 @@ cv.addEventListener("pointerup", endDraw); cv.addEventListener("pointercancel", 
 function clearPad(){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.restore(); dirty = false; }
 function openPad(){
   $("padModal").hidden = false; document.body.style.overflow = "hidden";
-  $("padWhere").textContent = "Seite " + (st.pending.page + 1) + " von " + st.pages.length;
+  const sp = st.pending.slot;
+  $("padWhere").textContent = sp != null ? "Zeile " + (sp + 1) + " von " + st.slots.length + ": " + st.slots[sp].text : "Seite " + (st.pending.page + 1) + " von " + st.pages.length;
+  $("padNext").hidden = !(sp != null && st.slots.some((s, i) => i !== sp && !st.items.some(it => it.slot === i)));
   requestAnimationFrame(() => { sizePad(); clearPad(); });
 }
 function closePad(){ $("padModal").hidden = true; document.body.style.overflow = ""; st.pending = null; }
@@ -430,6 +525,9 @@ function resize(f){ const it = selItem(); if(!it) return; if(it.type === "sig") 
 async function finish(){
   const sigs = st.items.filter(i => i.type === "sig").length;
   if(!sigs){ say($("signMsg"), "Bitte setzen Sie zuerst mindestens eine Unterschrift.", "err"); window.scrollTo({top:0, behavior:"smooth"}); return; }
+  const open = st.slots.filter((s, i) => !st.items.some(it => it.slot === i)).length;
+  if(open && !st.confirmGap){ st.confirmGap = true; $("finish").textContent = "Trotzdem fertig";
+    say($("signMsg"), open + (open === 1 ? " Zeile ist noch nicht unterschrieben." : " Zeilen sind noch nicht unterschrieben.") + " Tippen Sie auf „Trotzdem fertig“, wenn das so stimmt.", "err"); return; }
   say($("signMsg"), "Dokument wird erstellt …"); $("finish").disabled = true; st.sel = null; renderItems();
   try{
     const {PDFDocument, StandardFonts, rgb} = PDFLib;
@@ -473,9 +571,19 @@ function initSignEvents(){
   const zoom = f => { st.zoom = Math.min(3, Math.max(0.6, st.zoom * f)); layout(); };
   $("zIn").onclick = () => zoom(1.3); $("zOut").onclick = () => zoom(1/1.3);
   $("padClear").onclick = clearPad; $("padCancel").onclick = closePad;
-  $("padSave").onclick = () => { if(!dirty) return; const s = exportSig(); if(!s) return; const p = st.pending;
+  const saveSig = (goNext) => { if(!dirty) return; const s = exportSig(); if(!s) return; const p = st.pending;
     $("padModal").hidden = true; document.body.style.overflow = ""; st.pending = null;
-    addItem({type:"sig", page:p.page, x:p.x, y:p.y, w:0.2, img:s.img, ar:s.ar}); };
+    let it = {type:"sig", page:p.page, x:p.x, y:p.y, w:0.2, img:s.img, ar:s.ar};
+    if(p.slot != null){ // passend in die Zelle skalieren
+      const sl = st.slots[p.slot], cw = (sl.x1 - sl.x0) * sl.pw, ch = (sl.y1 - sl.y0) * sl.ph;
+      const wpx = Math.min(cw * 0.95, ch * 1.4 * s.ar);
+      it.w = wpx / sl.pw; it.slot = p.slot; }
+    addItem(it); st.sel = null; renderItems();
+    if(!goNext){ const ne = document.querySelector(".slot.next"); if(ne && ne.scrollIntoView) ne.scrollIntoView({block:"center", behavior:"smooth"}); }
+    if(goNext){ const n = nextSlot(); if(n >= 0){ const sl = st.slots[n];
+      st.pending = {page: sl.page, slot: n, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; st.pages[sl.page].wrap.scrollIntoView({block:"nearest"}); openPad(); } } };
+  $("padSave").onclick = () => saveSig(false);
+  $("padNext").onclick = () => saveSig(true);
   $("txtCancel").onclick = closeTxt;
   $("txtSave").onclick = () => { const t = $("txtIn").value.trim(); if(!t) return; const p = st.pending; $("txtModal").hidden = true; st.pending = null;
     addItem({type:"txt", page:p.page, x:p.x, y:p.y, text:t, fs:0.016}); };
@@ -486,6 +594,8 @@ function initSignEvents(){
   $("sDel").onclick = () => { st.items = st.items.filter(i => i.id !== st.sel); st.sel = null; renderItems(); };
   $("sOk").onclick = () => { st.sel = null; renderItems(); };
   $("finish").onclick = finish;
+  $("nextBtn").onclick = () => { const n = nextSlot(); if(n < 0) return; const sl = st.slots[n];
+    st.pending = {page: sl.page, slot: n, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); };
   addEventListener("keydown", e => { if(e.key === "Escape"){ if(!$("padModal").hidden) closePad(); if(!$("txtModal").hidden) closeTxt(); } });
 }
 

@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gründer-Elfen Unterschrift</title>
+<style>
+:root{
+  --bg:#f4f6f8; --card:#ffffff; --fg:#14202e; --muted:#5d6b7a; --line:#d5dce4;
+  --accent:#234bb0; --accent-fg:#ffffff; --ok:#1c7a46; --ok-bg:#e3f3ea; --err:#b3261e; --pad:#fbfcfe; --desk:#cfd6de;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161e; --card:#18212c; --fg:#e8eef5; --muted:#93a1b1; --line:#2c3947;
+  --accent:#7aa2ff; --accent-fg:#0b1220; --ok:#6fd49a; --ok-bg:#16301f; --err:#ff8a80; --desk:#0b0f14; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.4 var(--font);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(24px,env(safe-area-inset-bottom,0px))}
+#adminBody{display:flex;flex-direction:column;gap:14px}
+main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:1.4rem;margin:0}
+h2{font-size:1.05rem;margin:0}
+.muted{color:var(--muted)}.small{font-size:.85rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.label{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+input[type=text],input[type=email],input[type=password]{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.btn{font:inherit;font-weight:600;border-radius:10px;padding:12px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer;min-height:46px}
+.btn.sec{background:transparent;color:var(--accent)}
+.btn.danger{background:transparent;color:var(--err);border-color:var(--err)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.9rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.item:first-child{border-top:0}.item .n{min-width:0;flex:1 1 180px;overflow-wrap:anywhere}
+.msg{min-height:1.2em;font-size:.9rem}.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+/* Unterschreib-Ansicht */
+#vSign{max-width:none;margin:0}
+.bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+.seg{display:flex;border:1px solid var(--accent);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;color:var(--accent);font:inherit;font-weight:600;padding:10px;min-height:44px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-fg)}
+.pages{background:var(--desk);padding:10px;display:flex;flex-direction:column;gap:12px;overflow-x:auto;border-radius:8px;margin-top:8px}
+.pg{position:relative;background:#fff;flex:none;margin:0 auto;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.pg canvas{display:block;width:100%;height:auto}
+.it{position:absolute;transform:translate(-50%,-50%);touch-action:none;cursor:move;border:1.5px dashed transparent;user-select:none;-webkit-user-select:none}
+.it.sel{border-color:#2a62ff;background:rgba(42,98,255,.08)}
+.it img{display:block;width:100%;height:auto;pointer-events:none}
+.it span{display:block;white-space:nowrap;color:#0b1a4a;font-family:Helvetica,Arial,sans-serif;pointer-events:none;line-height:1}
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;justify-content:center;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.selbar .btn{flex:1 1 0;max-width:160px}
+.modal{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;
+  padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modal .wrap{max-width:900px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
+#padbox{flex:1;min-height:180px;position:relative;background:var(--pad);border:2px dashed var(--line);border-radius:12px;overflow:hidden}
+#pad{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+#padbox .line{position:absolute;left:6%;right:6%;bottom:28%;border-bottom:1px solid #9aa7b6;pointer-events:none}
+.actions{display:flex;gap:10px;flex-wrap:wrap}.actions .btn{flex:1 1 110px}
+.quick{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head><body>
+
+<!-- ============ Startseite ============ -->
+<main id="vHome" hidden>
+  <h1>Gründer-Elfen</h1>
+  <p class="muted">Dieser Link ist unvollständig. Bitte öffnen Sie den Link, den Sie von Turabi Akünlü erhalten haben.</p>
+</main>
+
+<!-- ============ Verwaltung ============ -->
+<main id="vAdmin" hidden>
+  <h1>Verwaltung</h1>
+  <form class="card" id="loginForm" autocomplete="on">
+    <h2>Anmelden</h2>
+    <input type="email" id="email" placeholder="E-Mail" autocomplete="username" required>
+    <input type="password" id="pw" placeholder="Passwort" autocomplete="current-password" required>
+    <button class="btn" type="submit">Anmelden</button>
+    <div class="msg err" id="loginMsg"></div>
+  </form>
+
+  <div id="adminBody" hidden>
+    <div class="card">
+      <h2>Neues Dokument zum Unterschreiben</h2>
+      <label class="label" for="docName">Bezeichnung (z. B. Anwesenheit Demiroglu)</label>
+      <input type="text" id="docName" placeholder="Anwesenheit Demiroglu">
+      <label class="label" for="docFile">PDF-Datei</label>
+      <input type="file" id="docFile" accept="application/pdf">
+      <button class="btn" id="upBtn">Hochladen und Link erstellen</button>
+      <div class="msg" id="upMsg"></div>
+      <div id="newLink" hidden class="row">
+        <input type="text" id="linkOut" readonly style="flex:1 1 220px">
+        <button class="btn sm" id="copyBtn">Kopieren</button>
+        <a class="btn sm" id="waBtn" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">WhatsApp</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>Zur Unterschrift bereit</h2><button class="btn sec sm" id="refOpen">Aktualisieren</button></div>
+      <div id="listOpen" class="muted small">Lädt …</div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>Unterschrieben zurück</h2><button class="btn sec sm" id="refSigned">Aktualisieren</button></div>
+      <div id="listSigned" class="muted small">Lädt …</div>
+    </div>
+    <button class="btn sec" id="logout">Abmelden</button>
+  </div>
+</main>
+
+<!-- ============ Kunden-Ansicht ============ -->
+<main id="vSign" hidden>
+  <div id="signHead" style="max-width:640px;margin:0 auto;width:100%">
+    <h1 id="docTitle">Dokument</h1>
+    <p class="muted small" id="howto">Tippen Sie im Dokument auf die Stelle, an der Sie unterschreiben sollen. Danach öffnet sich das Unterschriftsfeld. Mit dem Finger können Sie die Unterschrift im Dokument verschieben.</p>
+  </div>
+  <div class="bar" id="bar" hidden>
+    <div class="seg"><button id="mSig" aria-pressed="true">Unterschrift</button><button id="mTxt" aria-pressed="false">Text / Datum</button></div>
+    <div class="row">
+      <span class="small muted" id="cnt" style="flex:1"></span>
+      <button class="btn sec sm" id="zOut" aria-label="Kleiner">−</button>
+      <button class="btn sec sm" id="zIn" aria-label="Größer">+</button>
+      <button class="btn sm" id="finish">Fertig</button>
+    </div>
+  </div>
+  <div class="msg" id="signMsg" style="max-width:640px;margin:0 auto;width:100%"></div>
+  <div class="pages" id="pages" hidden></div>
+  <div class="card" id="doneCard" hidden style="max-width:640px;margin:0 auto;width:100%">
+    <h2>Vielen Dank!</h2>
+    <p id="doneTxt" class="muted" style="margin:0"></p>
+    <button class="btn" id="shareBtn">Kopie speichern oder teilen</button>
+  </div>
+</main>
+
+<div class="selbar" id="selbar" hidden>
+  <button class="btn sec" id="sSmall">Kleiner</button>
+  <button class="btn sec" id="sBig">Größer</button>
+  <button class="btn danger" id="sDel">Löschen</button>
+  <button class="btn" id="sOk">OK</button>
+</div>
+
+<div class="modal" id="padModal" hidden role="dialog" aria-modal="true" aria-label="Unterschrift">
+  <div class="wrap">
+    <div><div class="label">Bitte unterschreiben</div><div id="padWhere" class="muted small"></div></div>
+    <div id="padbox"><canvas id="pad"></canvas><div class="line"></div></div>
+    <div class="actions">
+      <button class="btn sec" id="padClear">Löschen</button>
+      <button class="btn sec" id="padCancel">Abbrechen</button>
+      <button class="btn" id="padSave">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="txtModal" hidden role="dialog" aria-modal="true" aria-label="Text einfügen">
+  <div class="wrap" style="flex:none">
+    <div class="label">Text einfügen</div>
+    <input type="text" id="txtIn" placeholder="z. B. Datum oder Name" autocomplete="off">
+    <div class="quick"><button class="btn sec sm" id="qToday">Heutiges Datum</button><button class="btn sec sm" id="qX">X</button></div>
+    <div class="actions">
+      <button class="btn sec" id="txtCancel">Abbrechen</button>
+      <button class="btn" id="txtSave">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== Einstellungen: hier trägt man die Supabase-Daten ein ====== */
+const SB_URL = "https://kblynujnzxrhzipojrxl.supabase.co";
+const SB_KEY = "sb_publishable_Wnva6Rn6qFPSYroCwahtIw_Ksi30Tlh";
+const BUCKET = "dokumente";
+/* ================================================================== */
+
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const sbBase = SB_URL.replace(/\/$/, "") + "/storage/v1/object";
+const configured = !SB_URL.startsWith("__");
+const ID_RE = /^[a-z0-9_-]{4,120}$/;
+function say(el, t, cls){ el.textContent = t || ""; el.className = "msg" + (cls ? " " + cls : ""); }
+
+/* ============================ Verwaltung ============================ */
+let token = null;
+const H = (extra) => Object.assign({apikey: SB_KEY, Authorization: "Bearer " + (token || SB_KEY)}, extra || {});
+
+function slug(s){
+  return (s || "dokument").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40) || "dokument";
+}
+function rid(){ const a = new Uint8Array(9); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(""); }
+function linkFor(d){ return location.origin + location.pathname + "?d=" + encodeURIComponent(d); }
+function niceName(base){ const p = base.split("__"); return (p[1] || p[0]).replace(/-/g," "); }
+
+async function login(e){
+  e.preventDefault(); say($("loginMsg"), "");
+  if(!configured){ say($("loginMsg"), "Supabase ist noch nicht eingetragen.", "err"); return; }
+  try{
+    const r = await fetch(SB_URL.replace(/\/$/,"") + "/auth/v1/token?grant_type=password", {
+      method: "POST", headers: {apikey: SB_KEY, "Content-Type": "application/json"},
+      body: JSON.stringify({email: $("email").value.trim(), password: $("pw").value})});
+    const j = await r.json();
+    if(!r.ok || !j.access_token) throw new Error("E-Mail oder Passwort falsch.");
+    token = j.access_token;
+    $("loginForm").hidden = true; $("adminBody").hidden = false;
+    refreshLists();
+  }catch(err){ say($("loginMsg"), err.message || "Anmeldung fehlgeschlagen.", "err"); }
+}
+async function list(prefix){
+  const r = await fetch(sbBase + "/list/" + BUCKET, {method:"POST", headers: H({"Content-Type":"application/json"}),
+    body: JSON.stringify({prefix, limit: 200, sortBy:{column:"created_at", order:"desc"}})});
+  if(!r.ok) throw new Error("Liste konnte nicht geladen werden.");
+  return (await r.json()).filter(x => x.name && x.name.endsWith(".pdf"));
+}
+async function del(path){
+  const r = await fetch(sbBase + "/" + BUCKET, {method:"DELETE", headers: H({"Content-Type":"application/json"}), body: JSON.stringify({prefixes:[path]})});
+  if(!r.ok) throw new Error("Löschen fehlgeschlagen.");
+}
+function fmtDate(s){ try{ return new Date(s).toLocaleString("de-DE",{dateStyle:"short", timeStyle:"short"}) }catch(e){ return "" } }
+function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.className = "btn sm " + cls; b.textContent = text; b.onclick = fn; return b; }
+
+async function renderOpen(){
+  const box = $("listOpen"); box.textContent = "Lädt …";
+  try{
+    const items = await list("offen"); box.textContent = "";
+    if(!items.length){ box.textContent = "Noch nichts hochgeladen."; return; }
+    items.forEach(it => {
+      const base = it.name.replace(/\.pdf$/,"");
+      const row = document.createElement("div"); row.className = "item";
+      const n = document.createElement("div"); n.className = "n"; n.textContent = niceName(base) + " · " + fmtDate(it.created_at);
+      const acts = document.createElement("div"); acts.className = "row";
+      acts.append(
+        mkBtn("Link kopieren","sec", async b => { try{ await navigator.clipboard.writeText(linkFor(base)); b.target.textContent = "Kopiert" }catch(e){ prompt && 0; b.target.textContent = linkFor(base) } }),
+        mkBtn("Löschen","danger", async () => { if(!confirmTwice(row)) return; try{ await del("offen/" + it.name); renderOpen() }catch(e){ alert(e.message) } }));
+      row.append(n, acts); box.append(row);
+    });
+  }catch(e){ box.textContent = e.message; }
+}
+const armed = new WeakSet();
+function confirmTwice(row){ // ersetzt confirm(): erster Tipp markiert, zweiter löscht
+  if(armed.has(row)) return true;
+  armed.add(row); row.style.background = "var(--ok-bg)";
+  const b = row.querySelector(".danger"); if(b) b.textContent = "Wirklich löschen?";
+  setTimeout(() => { armed.delete(row); row.style.background = ""; if(b) b.textContent = "Löschen"; }, 4000);
+  return false;
+}
+async function renderSigned(){
+  const box = $("listSigned"); box.textContent = "Lädt …";
+  try{
+    const items = await list("signiert"); box.textContent = "";
+    if(!items.length){ box.textContent = "Noch nichts zurückgekommen."; return; }
+    items.forEach(it => {
+      const base = it.name.replace(/\.pdf$/,"");
+      const row = document.createElement("div"); row.className = "item";
+      const n = document.createElement("div"); n.className = "n"; n.textContent = niceName(base.split("__").slice(0,2).join("__")) + " · " + fmtDate(it.created_at);
+      const acts = document.createElement("div"); acts.className = "row";
+      acts.append(
+        mkBtn("Herunterladen","", async b => {
+          try{
+            const r = await fetch(sbBase + "/authenticated/" + BUCKET + "/signiert/" + it.name, {headers: H()});
+            if(!r.ok) throw new Error("Download fehlgeschlagen");
+            const url = URL.createObjectURL(await r.blob());
+            const a = document.createElement("a"); a.href = url; a.download = "Unterschrieben_" + it.name; document.body.append(a); a.click(); a.remove();
+          }catch(e){ b.target.textContent = e.message }
+        }),
+        mkBtn("Löschen","danger", async () => { if(!confirmTwice(row)) return; try{ await del("signiert/" + it.name); renderSigned() }catch(e){ alert(e.message) } }));
+      row.append(n, acts); box.append(row);
+    });
+  }catch(e){ box.textContent = e.message; }
+}
+function refreshLists(){ renderOpen(); renderSigned(); }
+
+async function upload(){
+  const f = $("docFile").files[0], m = $("upMsg");
+  if(!f){ say(m, "Bitte zuerst eine PDF-Datei wählen.", "err"); return; }
+  if(f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ say(m, "Das ist keine PDF-Datei.", "err"); return; }
+  say(m, "Lädt hoch …");
+  const d = rid() + "__" + slug($("docName").value || f.name.replace(/\.pdf$/i,""));
+  try{
+    const r = await fetch(sbBase + "/" + BUCKET + "/offen/" + d + ".pdf", {method:"POST", headers: H({"Content-Type":"application/pdf"}), body: f});
+    if(!r.ok) throw new Error("Upload fehlgeschlagen (" + r.status + ").");
+    const link = linkFor(d);
+    $("linkOut").value = link; $("newLink").hidden = false;
+    $("waBtn").href = "https://wa.me/?text=" + encodeURIComponent("Guten Tag, bitte unterschreiben Sie hier: " + link);
+    say(m, "Fertig. Link ist bereit.", "ok"); $("docFile").value = ""; renderOpen();
+  }catch(e){ say(m, e.message, "err"); }
+}
+
+function initAdmin(){
+  $("vAdmin").hidden = false;
+  $("loginForm").addEventListener("submit", login);
+  $("upBtn").onclick = upload;
+  $("copyBtn").onclick = async () => { try{ await navigator.clipboard.writeText($("linkOut").value); $("copyBtn").textContent = "Kopiert" }catch(e){ $("linkOut").select() } };
+  $("refOpen").onclick = renderOpen; $("refSigned").onclick = renderSigned;
+  $("logout").onclick = () => { token = null; $("adminBody").hidden = true; $("loginForm").hidden = false; $("pw").value = ""; };
+  if(!configured) say($("loginMsg"), "Supabase ist noch nicht eingetragen.", "err");
+}
+
+/* ============================ Kunden-Ansicht ============================ */
+const st = {bytes:null, pages:[], items:[], mode:"sig", zoom:1, sel:null, pending:null, doc:null, last:null};
+let uid = 0;
+
+async function initSign(d){
+  $("vSign").hidden = false;
+  if(!ID_RE.test(d) || !configured){ say($("signMsg"), "Dieser Link ist ungültig.", "err"); return; }
+  $("docTitle").textContent = niceName(d).replace(/^./, c => c.toUpperCase());
+  say($("signMsg"), "Dokument wird geladen …");
+  try{
+    const r = await fetch(sbBase + "/public/" + BUCKET + "/offen/" + d + ".pdf");
+    if(!r.ok) throw new Error("Das Dokument wurde nicht gefunden. Bitte fragen Sie nach einem neuen Link.");
+    st.bytes = new Uint8Array(await r.arrayBuffer());
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    st.doc = await pdfjsLib.getDocument({data: st.bytes.slice()}).promise;
+    st.d = d;
+    await buildPages();
+    say($("signMsg"), "");
+    $("bar").hidden = false; $("pages").hidden = false; updateCount();
+  }catch(e){ say($("signMsg"), e.message || "Das Dokument konnte nicht geladen werden.", "err"); }
+}
+
+function baseWidth(){ return Math.max(280, Math.min(document.documentElement.clientWidth - 52, 1100)); }
+async function buildPages(){
+  const box = $("pages"); box.textContent = ""; st.pages = [];
+  for(let n = 1; n <= st.doc.numPages; n++){
+    const page = await st.doc.getPage(n), vp1 = page.getViewport({scale:1});
+    const wrap = document.createElement("div"); wrap.className = "pg"; wrap.dataset.i = n - 1;
+    const cv = document.createElement("canvas"); wrap.append(cv); box.append(wrap);
+    st.pages.push({page, vp1, wrap, cv});
+    wrap.addEventListener("click", ev => onPageClick(ev, n - 1));
+  }
+  await layout();
+}
+async function layout(){
+  const w = baseWidth() * st.zoom, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  for(const p of st.pages){
+    p.wrap.style.width = w + "px";
+    const sc = (w * dpr) / p.vp1.width, vp = p.page.getViewport({scale: sc});
+    p.cv.width = vp.width; p.cv.height = vp.height;
+    await p.page.render({canvasContext: p.cv.getContext("2d"), viewport: vp}).promise;
+  }
+  renderItems();
+}
+function pageW(pi){ return st.pages[pi].wrap.getBoundingClientRect().width; }
+
+function renderItems(){
+  st.pages.forEach(p => p.wrap.querySelectorAll(".it").forEach(e => e.remove()));
+  st.items.forEach(it => {
+    const p = st.pages[it.page], el = document.createElement("div");
+    el.className = "it" + (st.sel === it.id ? " sel" : ""); el.dataset.id = it.id;
+    el.style.left = it.x * 100 + "%"; el.style.top = it.y * 100 + "%";
+    const w = pageW(it.page);
+    if(it.type === "sig"){
+      el.style.width = it.w * 100 + "%";
+      const im = document.createElement("img"); im.src = it.img; im.alt = "Unterschrift"; el.append(im);
+    }else{
+      const s = document.createElement("span"); s.textContent = it.text; s.style.fontSize = it.fs * w + "px"; el.style.padding = "2px 4px"; el.append(s);
+    }
+    el.addEventListener("pointerdown", ev => startDrag(ev, it, el));
+    p.wrap.append(el);
+  });
+  const sb = $("selbar"); sb.hidden = st.sel == null;
+  document.body.style.paddingBottom = st.sel == null ? "" : "90px";
+  updateCount();
+}
+function updateCount(){ const s = st.items.filter(i => i.type === "sig").length; $("cnt").textContent = s ? s + (s === 1 ? " Unterschrift gesetzt" : " Unterschriften gesetzt") : "Noch keine Unterschrift"; }
+
+function startDrag(ev, it, el){
+  ev.stopPropagation(); ev.preventDefault();
+  const wasSel = st.sel === it.id; st.sel = it.id;
+  document.querySelectorAll(".it").forEach(e => e.classList.toggle("sel", e.dataset.id == it.id));
+  $("selbar").hidden = false; document.body.style.paddingBottom = "90px";
+  el.setPointerCapture(ev.pointerId);
+  const r = st.pages[it.page].wrap.getBoundingClientRect(); let moved = false;
+  const sx = ev.clientX, sy = ev.clientY, ox = it.x, oy = it.y;
+  const mv = e => { const dx = e.clientX - sx, dy = e.clientY - sy; if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    it.x = Math.min(1, Math.max(0, ox + dx / r.width)); it.y = Math.min(1, Math.max(0, oy + dy / r.height));
+    el.style.left = it.x * 100 + "%"; el.style.top = it.y * 100 + "%"; };
+  const up = () => { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); };
+  el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+}
+
+function onPageClick(ev, pi){
+  if(ev.target.closest(".it")) return;
+  if(st.sel != null){ st.sel = null; renderItems(); return; }
+  const r = st.pages[pi].wrap.getBoundingClientRect();
+  st.pending = {page: pi, x: (ev.clientX - r.left) / r.width, y: (ev.clientY - r.top) / r.height};
+  if(st.mode === "sig") openPad(); else openTxt();
+}
+
+/* Unterschriftsfeld */
+const cv = $("pad"), ctx = cv.getContext("2d"); let drawing = false, dirty = false, last = null;
+function sizePad(){
+  const r = $("padbox").getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0b1a4a"; ctx.lineWidth = 3;
+}
+const ppos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+cv.addEventListener("pointerdown", e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; last = ppos(e);
+  ctx.beginPath(); ctx.arc(last[0], last[1], 1.5, 0, 7); ctx.fillStyle = "#0b1a4a"; ctx.fill(); dirty = true; });
+cv.addEventListener("pointermove", e => { if(!drawing) return; e.preventDefault();
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for(const ev of (evs.length ? evs : [e])){ const p = ppos(ev); ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); last = p; } });
+const endDraw = () => { drawing = false; };
+cv.addEventListener("pointerup", endDraw); cv.addEventListener("pointercancel", endDraw);
+function clearPad(){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.restore(); dirty = false; }
+function openPad(){
+  $("padModal").hidden = false; document.body.style.overflow = "hidden";
+  $("padWhere").textContent = "Seite " + (st.pending.page + 1) + " von " + st.pages.length;
+  requestAnimationFrame(() => { sizePad(); clearPad(); });
+}
+function closePad(){ $("padModal").hidden = true; document.body.style.overflow = ""; st.pending = null; }
+function exportSig(){
+  const w = cv.width, h = cv.height, d = ctx.getImageData(0,0,w,h).data; let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ if(d[(y*w+x)*4+3] > 10){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+  if(x1 < x0) return null;
+  const m = 8; x0 = Math.max(0,x0-m); y0 = Math.max(0,y0-m); x1 = Math.min(w-1,x1+m); y1 = Math.min(h-1,y1+m);
+  const c = document.createElement("canvas"); c.width = x1-x0+1; c.height = y1-y0+1;
+  c.getContext("2d").drawImage(cv, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+  return {img: c.toDataURL("image/png"), ar: c.width / c.height};
+}
+function addItem(o){ o.id = ++uid; st.items.push(o); st.sel = o.id; renderItems(); }
+
+/* Text */
+function openTxt(){ $("txtModal").hidden = false; $("txtIn").value = ""; setTimeout(() => $("txtIn").focus(), 50); }
+function closeTxt(){ $("txtModal").hidden = true; st.pending = null; }
+
+/* Auswahlleiste */
+function selItem(){ return st.items.find(i => i.id === st.sel); }
+function resize(f){ const it = selItem(); if(!it) return; if(it.type === "sig") it.w = Math.min(0.9, Math.max(0.04, it.w * f)); else it.fs = Math.min(0.08, Math.max(0.006, it.fs * f)); renderItems(); }
+
+/* Fertig */
+async function finish(){
+  const sigs = st.items.filter(i => i.type === "sig").length;
+  if(!sigs){ say($("signMsg"), "Bitte setzen Sie zuerst mindestens eine Unterschrift.", "err"); window.scrollTo({top:0, behavior:"smooth"}); return; }
+  say($("signMsg"), "Dokument wird erstellt …"); $("finish").disabled = true; st.sel = null; renderItems();
+  try{
+    const {PDFDocument, StandardFonts, rgb} = PDFLib;
+    const pdf = await PDFDocument.load(st.bytes), font = await pdf.embedFont(StandardFonts.Helvetica), pgs = pdf.getPages();
+    for(const it of st.items){
+      const pg = pgs[it.page], W = pg.getWidth(), Hh = pg.getHeight(), cx = it.x * W, cy = Hh - it.y * Hh;
+      if(it.type === "sig"){
+        const im = await pdf.embedPng(it.img), w = it.w * W, h = w / it.ar;
+        pg.drawImage(im, {x: cx - w/2, y: cy - h/2, width: w, height: h});
+      }else{
+        let t = it.text, s = it.fs * W;
+        try{ font.widthOfTextAtSize(t, s); }catch(e){ t = t.replace(/[^\x20-\xFF]/g, "?"); }
+        pg.drawText(t, {x: cx - font.widthOfTextAtSize(t, s)/2, y: cy - s*0.3, size: s, font, color: rgb(.04,.1,.29)});
+      }
+    }
+    const out = await pdf.save(); st.out = out;
+    const stamp = new Date().toISOString().replace(/[-:T]/g,"").slice(0,14);
+    st.fname = "Unterschrieben_" + niceName(st.d).replace(/\s+/g,"_") + ".pdf";
+    let sent = false;
+    try{
+      const r = await fetch(sbBase + "/" + BUCKET + "/signiert/" + st.d + "__" + stamp + ".pdf", {method:"POST",
+        headers: {apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type":"application/pdf"}, body: out});
+      sent = r.ok;
+    }catch(e){}
+    $("bar").hidden = true; $("pages").hidden = true; $("howto").hidden = true; say($("signMsg"), "");
+    $("doneCard").hidden = false;
+    $("doneTxt").textContent = sent ? "Ihr unterschriebenes Dokument wurde an Turabi Akünlü übermittelt. Sie müssen nichts weiter tun."
+      : "Die Übermittlung hat nicht geklappt. Bitte senden Sie das Dokument mit dem Knopf unten per WhatsApp an Turabi Akünlü.";
+    $("shareBtn").onclick = shareOut;
+  }catch(e){ say($("signMsg"), "Fehler beim Erstellen: " + (e.message || e), "err"); $("finish").disabled = false; }
+}
+async function shareOut(){
+  const file = new File([st.out], st.fname, {type:"application/pdf"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title: st.fname}); return; }catch(e){ if(e && e.name === "AbortError") return; } }
+  const url = URL.createObjectURL(file), a = document.createElement("a"); a.href = url; a.download = st.fname; document.body.append(a); a.click(); a.remove();
+}
+
+function initSignEvents(){
+  const setMode = m => { st.mode = m; $("mSig").setAttribute("aria-pressed", m === "sig"); $("mTxt").setAttribute("aria-pressed", m === "txt"); };
+  $("mSig").onclick = () => setMode("sig"); $("mTxt").onclick = () => setMode("txt");
+  const zoom = f => { st.zoom = Math.min(3, Math.max(0.6, st.zoom * f)); layout(); };
+  $("zIn").onclick = () => zoom(1.3); $("zOut").onclick = () => zoom(1/1.3);
+  $("padClear").onclick = clearPad; $("padCancel").onclick = closePad;
+  $("padSave").onclick = () => { if(!dirty) return; const s = exportSig(); if(!s) return; const p = st.pending;
+    $("padModal").hidden = true; document.body.style.overflow = ""; st.pending = null;
+    addItem({type:"sig", page:p.page, x:p.x, y:p.y, w:0.2, img:s.img, ar:s.ar}); };
+  $("txtCancel").onclick = closeTxt;
+  $("txtSave").onclick = () => { const t = $("txtIn").value.trim(); if(!t) return; const p = st.pending; $("txtModal").hidden = true; st.pending = null;
+    addItem({type:"txt", page:p.page, x:p.x, y:p.y, text:t, fs:0.016}); };
+  $("txtIn").addEventListener("keydown", e => { if(e.key === "Enter") $("txtSave").click(); });
+  $("qToday").onclick = () => { $("txtIn").value = new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"}); };
+  $("qX").onclick = () => { $("txtIn").value = "X"; };
+  $("sSmall").onclick = () => resize(1/1.2); $("sBig").onclick = () => resize(1.2);
+  $("sDel").onclick = () => { st.items = st.items.filter(i => i.id !== st.sel); st.sel = null; renderItems(); };
+  $("sOk").onclick = () => { st.sel = null; renderItems(); };
+  $("finish").onclick = finish;
+  addEventListener("keydown", e => { if(e.key === "Escape"){ if(!$("padModal").hidden) closePad(); if(!$("txtModal").hidden) closeTxt(); } });
+}
+
+/* ============================ Start ============================ */
+if(qs.has("admin")) initAdmin();
+else if(qs.get("d")){ initSignEvents(); initSign(qs.get("d")); }
+else $("vHome").hidden = false;
+</script>
+</body></html>

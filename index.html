@@ -410,10 +410,6 @@ async function detectSlots(){
         const lab = items.find(u => u !== t && u.y > t.y && (u.y - t.y) * ph1 < 36 && /teilnehmer|kunde/i.test(u.s) && Math.abs(u.x - rx0) < 0.06);
         if(lab) lineSlots.push({page: pi, kind: "sig", x0: rx0, x1: rx1, y0: t.y - 40 / ph1, y1: t.y - 1 / ph1, text: lab.s.trim(), pw: pw1, ph: ph1});
       }
-      if(/ort,?\s*datum/i.test(t.s)){
-        const x0 = t.x + t.w + 0.012;
-        lineSlots.push({page: pi, kind: "txt", x0, x1: Math.min(0.97, x0 + 0.3), y0: t.y - 13 / ph1, y1: t.y + 3 / ph1, text: "Ort, Datum", pw: pw1, ph: ph1});
-      }
     });
     lineSlots.forEach(x => st.slots.push(x));
     st.dbg = (st.dbg || "") + " L" + (pi+1) + "=" + lineSlots.length;

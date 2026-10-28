@@ -421,7 +421,7 @@ async function detectSlots(){
       if(!rowItems.length) continue;
       rowItems.sort((a, b) => a.x - b.x);
       rowItems.forEach(t => { if(t.x * W >= xl - 2 && t.x * W < xr) endX = Math.max(endX, (t.x + t.w) * W); });
-      const txt = rowItems.map(t => t.s.trim()).filter(x => x && x.toLowerCase() !== "x").join(" · ");
+      const txt = rowItems.map(t => t.s.trim()).filter(x => x && x.toLowerCase() !== "x" && x !== "/").join(" · ");
       tbl.push({y0, y1, txt});
     }
     const sx0 = endX > xl ? Math.min(endX + W * 0.006, xr - W * 0.04) : xl;

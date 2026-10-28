@@ -358,7 +358,7 @@ async function buildPages(){
   await layout();
 }
 function goPage(i, smooth){
-  const p = st.pages[i]; if(!p) return; const box = $("pages");
+  const p = st.pages[(st.order || [])[i] != null ? st.order[i] : i]; if(!p) return; const box = $("pages");
   box.scrollTo({left: Math.max(0, p.wrap.offsetLeft - (box.clientWidth - p.wrap.offsetWidth) / 2), behavior: smooth ? "smooth" : "auto"});
   st.cur = i; pgUpdate();
 }
@@ -377,7 +377,11 @@ async function layout(){
   }
   const first = !st.detected;
   if(first){ st.detected = true; try{ await detectSlots(); }catch(e){ console.warn(e); } sortSlots();
-    st.cur = st.slots.length ? st.slots[0].page : (st.sigPage != null ? st.sigPage : 0); }
+    // Anzeige-Reihenfolge: Unterschriftsseite zuerst, danach die übrigen Seiten in Originalreihenfolge
+    const sp = st.slots.length ? st.slots[0].page : (st.sigPage != null ? st.sigPage : 0);
+    st.order = [sp, ...st.pages.map((x, i) => i).filter(i => i !== sp)];
+    st.order.forEach(i => $("pages").append(st.pages[i].wrap));
+    st.cur = 0; }
   renderItems();
   goPage(st.cur || 0, false);
 }
@@ -681,7 +685,7 @@ function initSignEvents(){
   $("pgPrev").onclick = () => goPage(Math.max(0, (st.cur || 0) - 1), true);
   $("pgNext").onclick = () => goPage(Math.min(st.pages.length - 1, (st.cur || 0) + 1), true);
   $("pages").addEventListener("scroll", () => { const box = $("pages"), c = box.scrollLeft + box.clientWidth / 2; let best = 0, bd = 1e9;
-    st.pages.forEach((p, i) => { const d = Math.abs(p.wrap.offsetLeft + p.wrap.offsetWidth / 2 - c); if(d < bd){ bd = d; best = i; } });
+    (st.order || st.pages.map((x, i) => i)).forEach((pi, i) => { const p = st.pages[pi], d = Math.abs(p.wrap.offsetLeft + p.wrap.offsetWidth / 2 - c); if(d < bd){ bd = d; best = i; } });
     if(best !== st.cur){ st.cur = best; pgUpdate(); } }, {passive: true});
   $("nextBtn").onclick = () => { const n = nextSlot(); if(n < 0) return; const sl = st.slots[n];
     st.pending = {page: sl.page, slot: n, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); };

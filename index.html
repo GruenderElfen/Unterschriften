@@ -554,13 +554,19 @@ async function detectSlots(){
 function sortSlots(){ st.slots.sort((a, b) => a.page - b.page || a.y0 - b.y0 || a.x0 - b.x0); }
 function nextSlot(){ return st.slots.findIndex((s, i) => !st.items.some(it => it.slot === i)); }
 
-let hintObs = null;
+let hintOn = false;
+function hintUpdate(){
+  const hint = $("scrollHint"); if(!hint) return;
+  if(st.finished || !st.slots.length || $("slotHead").hidden){ hint.hidden = true; return; }
+  const top = $("slotHead").getBoundingClientRect().top, vh = window.innerHeight || 700;
+  // nur ganz am Anfang der Seite (höchstens ein halber Bildschirm gescrollt) und solange die Liste noch nicht im Bild ist
+  hint.hidden = !(window.scrollY < vh * 0.5 && top > vh * 0.9);
+}
 function setupHint(){
-  const hint = $("scrollHint");
-  if(hintObs || !("IntersectionObserver" in window)){ return; }
-  hintObs = new IntersectionObserver(es => { const vis = es.some(e => e.isIntersecting); hint.hidden = vis || st.finished || !st.slots.length; }, {threshold: 0});
-  hintObs.observe($("slotHead"));
-  hint.onclick = () => $("slotHead").scrollIntoView({behavior: "smooth", block: "start"});
+  if(hintOn) { hintUpdate(); return; } hintOn = true;
+  addEventListener("scroll", hintUpdate, {passive: true}); addEventListener("resize", hintUpdate);
+  $("scrollHint").onclick = () => $("slotHead").scrollIntoView({behavior: "smooth", block: "start"});
+  hintUpdate();
 }
 function renderSlotList(){
   const ul = $("slotList"); ul.textContent = "";
@@ -608,7 +614,7 @@ function renderItems(){
     if(it.slot != null) el.style.pointerEvents = "none"; else el.addEventListener("pointerdown", ev => startDrag(ev, it, el));
     p.wrap.append(el);
   });
-  renderSlotList();
+  renderSlotList(); hintUpdate();
   document.querySelector(".seg").hidden = st.slots.length > 0;
   const sb = $("selbar"); sb.hidden = st.sel == null;
   document.body.style.paddingBottom = st.sel == null ? "" : "90px";

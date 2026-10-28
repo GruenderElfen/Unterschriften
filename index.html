@@ -492,6 +492,7 @@ function renderItems(){
     el.style.top = sl.y0 * 100 + "%"; el.style.height = (sl.y1 - sl.y0) * 100 + "%";
     const sp = document.createElement("span"); sp.textContent = String(i + 1);
     const hpx = (sl.y1 - sl.y0) * pageW(sl.page); sp.style.fontSize = Math.max(6, Math.min(15, hpx * 0.75)) + "px"; sp.style.padding = "1px 4px"; el.append(sp);
+    el.style.pointerEvents = "none";
     el.addEventListener("click", ev => { ev.stopPropagation(); if(st.sel != null){ st.sel = null; renderItems(); return; }
       st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; if(sl.kind === "txt") openTxt(sl.text); else openPad(); });
     st.pages[sl.page].wrap.append(el);
@@ -507,10 +508,11 @@ function renderItems(){
     }else{
       const s = document.createElement("span"); s.textContent = it.text; s.style.fontSize = it.fs * w + "px"; el.style.padding = "2px 4px"; el.append(s);
     }
-    el.addEventListener("pointerdown", ev => startDrag(ev, it, el));
+    if(it.slot != null) el.style.pointerEvents = "none"; else el.addEventListener("pointerdown", ev => startDrag(ev, it, el));
     p.wrap.append(el);
   });
   renderSlotList();
+  document.querySelector(".seg").hidden = st.slots.length > 0;
   const sb = $("selbar"); sb.hidden = st.sel == null;
   document.body.style.paddingBottom = st.sel == null ? "" : "90px";
   updateCount();
@@ -542,6 +544,7 @@ function startDrag(ev, it, el){
 }
 
 function onPageClick(ev, pi){
+  if(st.slots.length) return; // Mit erkannten Zeilen wird nur über die Liste unterschrieben
   if(ev.target.closest(".it")) return;
   if(st.sel != null){ st.sel = null; renderItems(); return; }
   const r = st.pages[pi].wrap.getBoundingClientRect();

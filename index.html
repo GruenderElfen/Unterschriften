@@ -109,8 +109,7 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
   <div id="adminBody" hidden>
     <div class="card">
       <h2>Neues Dokument zum Unterschreiben</h2>
-      <label class="label" for="docName">Bezeichnung (z. B. Anwesenheit Demiroglu). Bei mehreren Dateien wird der Dateiname genommen.</label>
-      <input type="text" id="docName" placeholder="Anwesenheit Demiroglu">
+      <p class="small muted" style="margin:0">Jede Datei bekommt unten einen Namen. Den kannst du vor dem Hochladen und später in der Liste ändern.</p>
       <span class="label">PDF-Dateien</span>
       <div id="drop" tabindex="0" role="button" aria-label="PDF-Dateien hierher ziehen oder auswählen">
         <strong>PDF-Dateien hierher ziehen</strong>
@@ -259,25 +258,40 @@ async function list(prefix){
   return (await r.json()).filter(x => x.name && x.name.endsWith(".pdf"));
 }
 async function del(path){
-  const r = await fetch(sbBase + "/" + BUCKET, {method:"DELETE", headers: H({"Content-Type":"application/json"}), body: JSON.stringify({prefixes:[path]})});
+  const r = await fetch(sbBase + "/" + BUCKET, {method:"DELETE", headers: H({"Content-Type":"application/json"}), body: JSON.stringify({prefixes: Array.isArray(path) ? path : [path]})});
   if(!r.ok) throw new Error("Löschen fehlgeschlagen.");
 }
 function fmtDate(s){ try{ return new Date(s).toLocaleString("de-DE",{dateStyle:"short", timeStyle:"short"}) }catch(e){ return "" } }
 function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.className = "btn sm " + cls; b.textContent = text; b.onclick = fn; return b; }
 
+async function renameDoc(curBase, newName){
+  const id = curBase.split("__")[0], nd = id + "__" + slug(newName);
+  if(nd === curBase) return;
+  const r = await fetch(sbBase + "/copy", {method:"POST", headers: H({"Content-Type":"application/json"}),
+    body: JSON.stringify({bucketId: BUCKET, sourceKey: "offen/" + curBase + ".pdf", destinationKey: "offen/" + nd + ".pdf"})});
+  if(!r.ok) throw new Error("Umbenennen fehlgeschlagen (" + r.status + ")");
+}
 async function renderOpen(){
   const box = $("listOpen"); box.textContent = "Lädt …";
   try{
     const items = await list("offen"); box.textContent = "";
     if(!items.length){ box.textContent = "Noch nichts hochgeladen."; return; }
-    items.forEach(it => {
-      const base = it.name.replace(/\.pdf$/,"");
+    const groups = new Map(); // je Dokument-ID: neueste Variante zeigen, alle beim Löschen entfernen
+    items.forEach(it => { const base = it.name.replace(/\.pdf$/,""), id = base.split("__")[0];
+      if(!groups.has(id)) groups.set(id, {base, created: it.created_at, files: []}); groups.get(id).files.push("offen/" + it.name); });
+    groups.forEach(g => {
       const row = document.createElement("div"); row.className = "item";
-      const n = document.createElement("div"); n.className = "n"; n.textContent = niceName(base) + " · " + fmtDate(it.created_at);
+      const n = document.createElement("div"); n.className = "n"; n.textContent = niceName(g.base) + " · " + fmtDate(g.created);
       const acts = document.createElement("div"); acts.className = "row";
       acts.append(
-        mkBtn("Link kopieren","sec", async b => { try{ await navigator.clipboard.writeText(linkFor(base)); b.target.textContent = "Kopiert" }catch(e){ prompt && 0; b.target.textContent = linkFor(base) } }),
-        mkBtn("Löschen","danger", async () => { if(!confirmTwice(row)) return; try{ await del("offen/" + it.name); renderOpen() }catch(e){ alert(e.message) } }));
+        mkBtn("Link kopieren","sec", async b => { try{ await navigator.clipboard.writeText(linkFor(g.base)); b.target.textContent = "Kopiert" }catch(e){ b.target.textContent = linkFor(g.base) } }),
+        mkBtn("Umbenennen","sec", () => {
+          row.textContent = ""; const inp = document.createElement("input"); inp.type = "text"; inp.value = niceName(g.base); inp.style.flex = "1 1 180px";
+          const ok = mkBtn("Speichern","", async () => { const v = inp.value.trim(); if(!v) return; ok.disabled = true; try{ await renameDoc(g.base, v); renderOpen(); }catch(e){ alert(e.message); ok.disabled = false; } });
+          const no = mkBtn("Abbrechen","sec", renderOpen); const w = document.createElement("div"); w.className = "row"; w.style.cssText = "flex:1 1 100%"; w.append(inp, ok, no); row.append(w); inp.focus(); inp.select();
+          inp.addEventListener("keydown", e => { if(e.key === "Enter") ok.click(); if(e.key === "Escape") no.click(); });
+        }),
+        mkBtn("Löschen","danger", async () => { if(!confirmTwice(row)) return; try{ await del(g.files); renderOpen() }catch(e){ alert(e.message) } }));
       row.append(n, acts); box.append(row);
     });
   }catch(e){ box.textContent = e.message; }
@@ -319,27 +333,25 @@ function refreshLists(){ renderOpen(); renderSigned(); }
 let picked = [];
 function renderPicked(){
   const box = $("chosen"); box.textContent = "";
-  picked.forEach((f, i) => { const r = document.createElement("div"); r.className = "f";
-    const n = document.createElement("span"); n.textContent = f.name + " (" + Math.max(1, Math.round(f.size / 1024)) + " KB)";
+  picked.forEach((p, i) => { const r = document.createElement("div"); r.className = "f";
+    const inp = document.createElement("input"); inp.type = "text"; inp.value = p.name; inp.setAttribute("aria-label", "Name der Datei " + (i + 1)); inp.style.flex = "1 1 160px";
+    inp.oninput = () => { p.name = inp.value; };
     const x = document.createElement("button"); x.type = "button"; x.className = "btn sec sm"; x.textContent = "Entfernen"; x.onclick = () => { picked.splice(i, 1); renderPicked(); };
-    r.append(n, x); box.append(r); });
+    r.append(inp, x); box.append(r); });
 }
 function addPicked(list){
   const arr = Array.from(list || []), rej = arr.filter(f => f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf"));
-  arr.filter(f => !rej.includes(f)).forEach(f => { if(!picked.some(p => p.name === f.name && p.size === f.size)) picked.push(f); });
+  arr.filter(f => !rej.includes(f)).forEach(f => { if(!picked.some(p => p.f.name === f.name && p.f.size === f.size)) picked.push({f, name: f.name.replace(/\.pdf$/i, "")}); });
   say($("upMsg"), rej.length ? rej.length + " Datei(en) ignoriert, weil sie keine PDF sind." : "", rej.length ? "err" : "");
   renderPicked();
 }
 async function upload(){
   const files = picked.slice(), m = $("upMsg"), box = $("newLinks");
   if(!files.length){ say(m, "Bitte zuerst mindestens eine PDF-Datei wählen.", "err"); return; }
-  const bad = files.filter(f => f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf"));
-  if(bad.length){ say(m, "Das ist keine PDF-Datei: " + bad[0].name, "err"); return; }
   $("upBtn").disabled = true; box.textContent = ""; box.hidden = false;
   let ok = 0, fail = 0;
   for(let i = 0; i < files.length; i++){
-    const f = files[i], base = f.name.replace(/\.pdf$/i, "");
-    const label = (files.length === 1 && $("docName").value.trim()) ? $("docName").value.trim() : base;
+    const f = files[i].f, label = (files[i].name || "").trim() || f.name.replace(/\.pdf$/i, "");
     say(m, "Lädt hoch … (" + (i + 1) + " von " + files.length + ")");
     const d = rid() + "__" + slug(label);
     try{
@@ -348,7 +360,7 @@ async function upload(){
       ok++; addLinkRow(box, label, linkFor(d));
     }catch(e){ fail++; const p = document.createElement("div"); p.className = "msg err"; p.textContent = label + ": " + (e.message || "Fehler"); box.append(p); }
   }
-  $("upBtn").disabled = false; $("docFile").value = ""; $("docName").value = ""; picked = []; renderPicked();
+  $("upBtn").disabled = false; $("docFile").value = ""; picked = []; renderPicked();
   say(m, ok + (ok === 1 ? " Dokument hochgeladen." : " Dokumente hochgeladen.") + (fail ? " " + fail + " fehlgeschlagen." : ""), fail ? "err" : "ok");
   renderOpen();
 }

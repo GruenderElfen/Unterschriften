@@ -71,6 +71,11 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .srow:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 body.nozoom,body.nozoom *{touch-action:pan-x pan-y}
 body.nozoom #pad,body.nozoom .it{touch-action:none}
+#scrollHint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:9;display:flex;align-items:center;gap:10px;
+  background:var(--accent);color:var(--accent-fg);border:0;border-radius:999px;padding:12px 20px;font:inherit;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer;max-width:calc(100% - 32px)}
+#scrollHint .ar{display:inline-block;font-size:1.3rem;line-height:1;animation:bob 1.1s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(-3px)}50%{transform:translateY(5px)}}
+@media (prefers-reduced-motion:reduce){#scrollHint .ar{animation:none}}
 .selbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;justify-content:center;
   padding:10px max(16px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .selbar .btn{flex:1 1 0;max-width:160px}
@@ -164,6 +169,7 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
   </div>
 </main>
 
+<button id="scrollHint" type="button" hidden><span class="ar" aria-hidden="true">↓</span><span>Nach unten scrollen zum Unterschreiben</span></button>
 <div class="selbar" id="selbar" hidden>
   <button class="btn sec" id="sSmall">Kleiner</button>
   <button class="btn sec" id="sBig">Größer</button>
@@ -548,9 +554,17 @@ async function detectSlots(){
 function sortSlots(){ st.slots.sort((a, b) => a.page - b.page || a.y0 - b.y0 || a.x0 - b.x0); }
 function nextSlot(){ return st.slots.findIndex((s, i) => !st.items.some(it => it.slot === i)); }
 
+let hintObs = null;
+function setupHint(){
+  const hint = $("scrollHint");
+  if(hintObs || !("IntersectionObserver" in window)){ return; }
+  hintObs = new IntersectionObserver(es => { const vis = es.some(e => e.isIntersecting); hint.hidden = vis || st.finished || !st.slots.length; }, {threshold: 0});
+  hintObs.observe($("slotHead"));
+  hint.onclick = () => $("slotHead").scrollIntoView({behavior: "smooth", block: "start"});
+}
 function renderSlotList(){
   const ul = $("slotList"); ul.textContent = "";
-  const on = st.slots.length > 0; ul.hidden = !on; $("slotHead").hidden = !on;
+  const on = st.slots.length > 0; ul.hidden = !on; $("slotHead").hidden = !on; if(on) setupHint();
   if(on) $("howto").textContent = "Unter dem Dokument finden Sie Ihre Zeilen. Tippen Sie auf „Unterschreiben“, zeichnen Sie Ihre Unterschrift und tippen Sie auf „Übernehmen“. Sie wird automatisch in die richtige Zeile eingetragen.";
   st.slots.forEach((sl, i) => {
     const it = st.items.find(x => x.slot === i);
@@ -714,6 +728,7 @@ async function finish(){
         headers: {apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type":"application/pdf"}, body: out});
       sent = r.ok;
     }catch(e){}
+    st.finished = true; $("scrollHint").hidden = true; $("slotHead").hidden = true; $("slotList").hidden = true; $("slotMsg").hidden = true;
     $("bar").hidden = true; $("pages").hidden = true; $("howto").hidden = true; say($("signMsg"), "");
     $("doneCard").hidden = false;
     $("doneTxt").textContent = sent ? "Ihr unterschriebenes Dokument wurde an Turabi Akünlü übermittelt. Sie müssen nichts weiter tun."

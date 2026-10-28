@@ -363,7 +363,12 @@ function runs(arr, minLen){ // arr: Uint8Array(0/1) -> zusammengefasste Position
 async function detectSlots(){
   st.slots = [];
   for(let pi = 0; pi < st.pages.length; pi++){
-    const p = st.pages[pi], cvp = p.cv, W = cvp.width, Hh = cvp.height;
+    const p = st.pages[pi];
+    // eigene, hochauflösende Zeichnung nur für die Erkennung (dünne Linien bleiben so sichtbar)
+    const cvp = document.createElement("canvas"), vpd = p.page.getViewport({scale: 2200 / p.vp1.width});
+    cvp.width = Math.round(vpd.width); cvp.height = Math.round(vpd.height);
+    await p.page.render({canvasContext: cvp.getContext("2d"), viewport: vpd}).promise;
+    const W = cvp.width, Hh = cvp.height;
     const tc = await p.page.getTextContent(), vp1 = p.vp1;
     const items = [];
     tc.items.forEach(t => { if(!t.str || !t.str.trim()) return;
@@ -372,9 +377,10 @@ async function detectSlots(){
     const hdr = [];
     items.forEach(t => { const m = t.s.toLowerCase().indexOf("unterschrift"); if(m >= 0){
       const L = t.s.length; hdr.push({cx: t.x + t.w * (m + 6) / L, y: t.y}); } });
+    st.dbg = (st.dbg || "") + " S" + (pi+1) + ":hdr=" + hdr.length;
     if(!hdr.length) continue;
     const img = cvp.getContext("2d").getImageData(0, 0, W, Hh).data;
-    const dark = (x, y) => { const i = (y * W + x) * 4; return img[i+3] > 100 && (img[i] + img[i+1] + img[i+2]) < 330; };
+    const dark = (x, y) => { const i = (y * W + x) * 4; return img[i+3] > 100 && (img[i] + img[i+1] + img[i+2]) < 420; };
     // horizontale Linien
     const hl = [];
     for(let y = 0; y < Hh; y++){ let best = 0, cur = 0;
@@ -387,11 +393,12 @@ async function detectSlots(){
       if(best > Hh * 0.12) vl.push(x); }
     const merge = a => { const r = []; a.forEach(v => { if(r.length && v - r[r.length-1].e <= 4){ r[r.length-1].e = v; } else r.push({s: v, e: v}); }); return r.map(o => (o.s + o.e) / 2); };
     const H = merge(hl), V = merge(vl);
+    st.dbg += ",H=" + H.length + ",V=" + V.length;
     if(H.length < 3 || V.length < 2) continue;
     const h0 = hdr[0], hx = h0.cx * W, hy = h0.y * Hh;
     let xl = null, xr = null;
     for(let i = 0; i < V.length - 1; i++){ if(V[i] < hx && V[i+1] > hx){ xl = V[i]; xr = V[i+1]; } }
-    if(xl == null) continue;
+    if(xl == null){ st.dbg += ",keineSpalte"; continue; }
     // Kopfzeile: letzte Linie über dem Text; Zeilen: Linienpaare darunter
     const rowsY = H.filter(y => y > hy);
     if(rowsY.length < 2) continue;
@@ -447,6 +454,7 @@ function renderItems(){
 }
 function updateCount(){
   const s = st.items.filter(i => i.type === "sig").length;
+  if(qs.has("debug")){ $("cnt").textContent = "Debug:" + (st.dbg || " nichts") + " Zeilen=" + st.slots.length; return; }
   if(st.slots.length){ const done = st.items.filter(i => i.slot != null).length; $("cnt").textContent = done + " von " + st.slots.length + " Zeilen unterschrieben. Tippen Sie auf das blau markierte Feld."; }
   else $("cnt").textContent = s ? s + (s === 1 ? " Unterschrift gesetzt" : " Unterschriften gesetzt") : "Noch keine Unterschrift. Tippen Sie auf die Stelle im Dokument.";
   st.confirmGap = false; $("finish").textContent = "Fertig";

@@ -101,6 +101,7 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
     <h2>Anmelden</h2>
     <input type="email" id="email" placeholder="E-Mail" autocomplete="username" required>
     <input type="password" id="pw" placeholder="Passwort" autocomplete="current-password" required>
+    <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="stay" checked style="width:20px;height:20px"> Auf diesem Gerät angemeldet bleiben</label>
     <button class="btn" type="submit">Anmelden</button>
     <div class="msg err" id="loginMsg"></div>
   </form>
@@ -232,9 +233,24 @@ async function login(e){
     const j = await r.json();
     if(!r.ok || !j.access_token) throw new Error("E-Mail oder Passwort falsch.");
     token = j.access_token;
+    try{ if($("stay").checked && j.refresh_token) localStorage.setItem("ge_rt", j.refresh_token); else localStorage.removeItem("ge_rt"); }catch(e){}
     $("loginForm").hidden = true; $("adminBody").hidden = false;
     refreshLists();
   }catch(err){ say($("loginMsg"), err.message || "Anmeldung fehlgeschlagen.", "err"); }
+}
+async function autoLogin(){
+  let rt = null; try{ rt = localStorage.getItem("ge_rt"); }catch(e){}
+  if(!rt || !configured) return;
+  say($("loginMsg"), "Anmeldung läuft …");
+  try{
+    const r = await fetch(SB_URL.replace(/\/$/,"") + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", headers: {apikey: SB_KEY, "Content-Type": "application/json"}, body: JSON.stringify({refresh_token: rt})});
+    const j = await r.json();
+    if(!r.ok || !j.access_token) throw new Error("abgelaufen");
+    token = j.access_token;
+    try{ if(j.refresh_token) localStorage.setItem("ge_rt", j.refresh_token); }catch(e){}
+    say($("loginMsg"), ""); $("loginForm").hidden = true; $("adminBody").hidden = false; refreshLists();
+  }catch(e){ try{ localStorage.removeItem("ge_rt"); }catch(x){} say($("loginMsg"), "Bitte neu anmelden."); }
 }
 async function list(prefix){
   const r = await fetch(sbBase + "/list/" + BUCKET, {method:"POST", headers: H({"Content-Type":"application/json"}),
@@ -361,8 +377,9 @@ function initAdmin(){
   // Datei neben das Feld fallen lassen soll den Browser nicht das PDF öffnen lassen
   ["dragover","drop"].forEach(n => window.addEventListener(n, e => { if(!dz.contains(e.target)) e.preventDefault(); }));
   $("refOpen").onclick = renderOpen; $("refSigned").onclick = renderSigned;
-  $("logout").onclick = () => { token = null; $("adminBody").hidden = true; $("loginForm").hidden = false; $("pw").value = ""; };
+  $("logout").onclick = () => { try{ localStorage.removeItem("ge_rt"); }catch(e){} token = null; $("adminBody").hidden = true; $("loginForm").hidden = false; $("pw").value = ""; };
   if(!configured) say($("loginMsg"), "Supabase ist noch nicht eingetragen.", "err");
+  autoLogin();
 }
 
 /* ============================ Kunden-Ansicht ============================ */

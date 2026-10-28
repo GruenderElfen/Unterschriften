@@ -55,6 +55,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 @keyframes pulse{50%{background:rgba(42,98,255,.08)}}
 .slist{display:flex;flex-direction:column;gap:8px;max-width:640px;margin:14px auto 0;width:100%;padding:0;list-style:none}
 .srow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-height:62px;cursor:pointer}
+.srow.missing{border-color:var(--err);border-width:2px}
 .srow.done{border-color:var(--ok);background:var(--ok-bg)}
 .srow .t{flex:1;min-width:0;font-weight:600}.srow .t small{display:block;color:var(--muted);font-weight:400;overflow-wrap:anywhere}
 .srow img{height:36px;width:96px;object-fit:contain;background:#fbfcfe;border-radius:4px;flex:none}
@@ -142,6 +143,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
   <div class="msg" id="signMsg" style="max-width:640px;margin:0 auto;width:100%"></div>
   <div class="pages" id="pages" hidden></div>
   <h2 id="slotHead" hidden style="max-width:640px;margin:16px auto 0;width:100%">Unterschreiben Sie Zeile für Zeile</h2>
+  <div class="msg" id="slotMsg" style="max-width:640px;margin:8px auto 0;width:100%"></div>
   <ul class="slist" id="slotList" hidden></ul>
   <div class="card" id="doneCard" hidden style="max-width:640px;margin:0 auto;width:100%">
     <h2>Vielen Dank!</h2>
@@ -437,7 +439,7 @@ function renderSlotList(){
   st.slots.forEach((sl, i) => {
     const it = st.items.find(x => x.slot === i);
     const li = document.createElement("li"), b = document.createElement("button");
-    b.type = "button"; b.className = "srow" + (it ? " done" : "");
+    b.type = "button"; b.className = "srow" + (it ? " done" : (st.flagMissing ? " missing" : ""));
     const t = document.createElement("span"); t.className = "t"; t.textContent = "Zeile " + (i + 1);
     const sm = document.createElement("small"); sm.textContent = sl.text; t.append(sm); b.append(t);
     if(it){ const im = document.createElement("img"); im.src = it.img; im.alt = "Ihre Unterschrift"; b.append(im);
@@ -455,7 +457,8 @@ function renderItems(){
     const el = document.createElement("div"); el.className = "slot" + (i === ns ? " next" : "");
     el.style.left = sl.x0 * 100 + "%"; el.style.width = (sl.x1 - sl.x0) * 100 + "%";
     el.style.top = sl.y0 * 100 + "%"; el.style.height = (sl.y1 - sl.y0) * 100 + "%";
-    const sp = document.createElement("span"); sp.textContent = "Zeile " + (i + 1) + " – hier unterschreiben"; el.append(sp);
+    const sp = document.createElement("span"); sp.textContent = String(i + 1);
+    const hpx = (sl.y1 - sl.y0) * pageW(sl.page); sp.style.fontSize = Math.max(6, Math.min(15, hpx * 0.75)) + "px"; sp.style.padding = "1px 4px"; el.append(sp);
     el.addEventListener("click", ev => { ev.stopPropagation(); if(st.sel != null){ st.sel = null; renderItems(); return; }
       st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); });
     st.pages[sl.page].wrap.append(el);
@@ -484,7 +487,7 @@ function updateCount(){
   if(qs.has("debug")){ $("cnt").textContent = "Debug:" + (st.dbg || " nichts") + " Zeilen=" + st.slots.length; return; }
   if(st.slots.length){ const done = st.items.filter(i => i.slot != null).length; $("cnt").textContent = done + " von " + st.slots.length + " Zeilen unterschrieben. Die Liste steht unter dem Dokument."; }
   else $("cnt").textContent = s ? s + (s === 1 ? " Unterschrift gesetzt" : " Unterschriften gesetzt") : "Noch keine Unterschrift. Tippen Sie auf die Stelle im Dokument.";
-  st.confirmGap = false; $("finish").textContent = "Fertig";
+  if($("slotMsg").textContent && st.slots.every((x, i) => st.items.some(it => it.slot === i))){ say($("slotMsg"), ""); say($("signMsg"), ""); }
   const n = nextSlot(), nb = $("nextBtn");
   nb.hidden = true;
   if(!nb.hidden){ const dm = (st.slots[n].text || "").match(/\d{2}\.\d{2}\.\d{4}/); nb.textContent = "Zeile " + (n + 1) + " unterschreiben" + (dm ? " (" + dm[0] + ")" : ""); }
@@ -560,9 +563,14 @@ function resize(f){ const it = selItem(); if(!it) return; if(it.type === "sig") 
 async function finish(){
   const sigs = st.items.filter(i => i.type === "sig").length;
   if(!sigs){ say($("signMsg"), "Bitte setzen Sie zuerst mindestens eine Unterschrift.", "err"); window.scrollTo({top:0, behavior:"smooth"}); return; }
-  const open = st.slots.filter((s, i) => !st.items.some(it => it.slot === i)).length;
-  if(open && !st.confirmGap){ st.confirmGap = true; $("finish").textContent = "Trotzdem fertig";
-    say($("signMsg"), open + (open === 1 ? " Zeile ist noch nicht unterschrieben." : " Zeilen sind noch nicht unterschrieben.") + " Tippen Sie auf „Trotzdem fertig“, wenn das so stimmt.", "err"); return; }
+  const missing = st.slots.map((x, i) => i).filter(i => !st.items.some(it => it.slot === i));
+  if(missing.length){
+    st.flagMissing = true; renderItems();
+    const names = missing.map(i => "Zeile " + (i + 1)).join(", ");
+    const m = "Bitte unterschreiben Sie alle Zeilen. Es fehlt noch: " + names + ".";
+    say($("slotMsg"), m, "err"); say($("signMsg"), m, "err");
+    const first = document.querySelector(".srow.missing"); if(first && first.scrollIntoView) first.scrollIntoView({block:"center", behavior:"smooth"});
+    return; }
   say($("signMsg"), "Dokument wird erstellt …"); $("finish").disabled = true; st.sel = null; renderItems();
   try{
     const {PDFDocument, StandardFonts, rgb} = PDFLib;

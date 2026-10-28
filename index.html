@@ -41,8 +41,9 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .seg{display:flex;border:1px solid var(--accent);border-radius:10px;overflow:hidden}
 .seg button{flex:1;border:0;background:transparent;color:var(--accent);font:inherit;font-weight:600;padding:10px;min-height:44px;cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-fg)}
-.pages{background:var(--desk);padding:10px;display:flex;flex-direction:column;gap:12px;overflow-x:auto;border-radius:8px;margin-top:8px}
-.pg{position:relative;background:#fff;flex:none;margin:0 auto;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.pages{position:relative;background:var(--desk);padding:10px;display:flex;flex-direction:row;gap:14px;overflow-x:auto;border-radius:8px;margin-top:8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.pg{position:relative;background:#fff;flex:none;margin:0;scroll-snap-align:center;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.pg:only-child{margin:0 auto}
 .pg canvas{display:block;width:100%;height:auto}
 .it{position:absolute;transform:translate(-50%,-50%);touch-action:none;cursor:move;border:1.5px dashed transparent;user-select:none;-webkit-user-select:none}
 .it.sel{border-color:#2a62ff;background:rgba(42,98,255,.08)}
@@ -133,6 +134,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
     <button class="btn" id="nextBtn" hidden></button>
     <div class="row">
       <span class="small muted" id="cnt" style="flex:1 1 100%"></span>
+      <span class="row" id="pgNav" hidden style="flex:1 1 100%;justify-content:space-between"><button class="btn sec sm" id="pgPrev" aria-label="Vorherige Seite">‹ Zurück</button><span class="small muted" id="pgInfo"></span><button class="btn sec sm" id="pgNext" aria-label="Nächste Seite">Weiter ›</button></span>
       <span class="small muted">Inhalt zoomen</span>
       <button class="btn sec sm" id="zOut" aria-label="Inhalt verkleinern">−</button>
       <button class="btn sec sm" id="zIn" aria-label="Inhalt vergrößern">+</button>
@@ -348,6 +350,16 @@ async function buildPages(){
   }
   await layout();
 }
+function goPage(i, smooth){
+  const p = st.pages[i]; if(!p) return; const box = $("pages");
+  box.scrollTo({left: Math.max(0, p.wrap.offsetLeft - (box.clientWidth - p.wrap.offsetWidth) / 2), behavior: smooth ? "smooth" : "auto"});
+  st.cur = i; pgUpdate();
+}
+function pgUpdate(){
+  const n = st.pages.length; $("pgNav").hidden = n < 2; if(n < 2) return;
+  $("pgInfo").textContent = "Seite " + ((st.cur || 0) + 1) + " von " + n;
+  $("pgPrev").disabled = !(st.cur > 0); $("pgNext").disabled = !(st.cur < n - 1);
+}
 async function layout(){
   const w = baseWidth() * st.zoom, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   for(const p of st.pages){
@@ -356,8 +368,11 @@ async function layout(){
     p.cv.width = vp.width; p.cv.height = vp.height;
     await p.page.render({canvasContext: p.cv.getContext("2d"), viewport: vp}).promise;
   }
-  if(!st.detected){ st.detected = true; try{ await detectSlots(); }catch(e){ console.warn(e); } }
+  const first = !st.detected;
+  if(first){ st.detected = true; try{ await detectSlots(); }catch(e){ console.warn(e); } sortSlots();
+    st.cur = st.slots.length ? st.slots[0].page : (st.sigPage != null ? st.sigPage : 0); }
   renderItems();
+  goPage(st.cur || 0, false);
 }
 function pageW(pi){ return st.pages[pi].wrap.getBoundingClientRect().width; }
 
@@ -385,6 +400,23 @@ async function detectSlots(){
     tc.items.forEach(t => { if(!t.str || !t.str.trim()) return;
       const pt = vp1.convertToViewportPoint(t.transform[4], t.transform[5]);
       items.push({s: t.str, x: pt[0] / vp1.width, y: pt[1] / vp1.height, w: t.width / vp1.width, h: (t.height || 10) / vp1.height}); });
+    // Unterschriftslinien (…… oder ____) mit Beschriftung "Teilnehmer…" darunter, sowie Feld "Ort, Datum"
+    if(items.some(t => /unterschrift|ort,?\s*datum|teilnehmer\/in/i.test(t.s))) st.sigPage = pi;
+    const pw1 = vp1.width, ph1 = vp1.height, lineSlots = [];
+    items.forEach(t => {
+      const re = /[.…_\u2026\-]{6,}/g; let m;
+      while((m = re.exec(t.s))){
+        const L = t.s.length, rx0 = t.x + t.w * m.index / L, rx1 = t.x + t.w * (m.index + m[0].length) / L;
+        const lab = items.find(u => u !== t && u.y > t.y && (u.y - t.y) * ph1 < 36 && /teilnehmer|kunde/i.test(u.s) && Math.abs(u.x - rx0) < 0.06);
+        if(lab) lineSlots.push({page: pi, kind: "sig", x0: rx0, x1: rx1, y0: t.y - 40 / ph1, y1: t.y - 1 / ph1, text: lab.s.trim(), pw: pw1, ph: ph1});
+      }
+      if(/ort,?\s*datum/i.test(t.s)){
+        const x0 = t.x + t.w + 0.012;
+        lineSlots.push({page: pi, kind: "txt", x0, x1: Math.min(0.97, x0 + 0.3), y0: t.y - 13 / ph1, y1: t.y + 3 / ph1, text: "Ort, Datum", pw: pw1, ph: ph1});
+      }
+    });
+    lineSlots.forEach(x => st.slots.push(x));
+    st.dbg = (st.dbg || "") + " L" + (pi+1) + "=" + lineSlots.length;
     const hdr = [];
     items.forEach(t => { const m = t.s.toLowerCase().indexOf("unterschrift"); if(m >= 0){
       const L = t.s.length; hdr.push({cx: t.x + t.w * (m + 6) / L, y: t.y}); } });
@@ -430,6 +462,7 @@ async function detectSlots(){
     tbl.forEach(r => st.slots.push({page: pi, x0: sx0 / W, x1: xr / W, y0: r.y0 / Hh, y1: r.y1 / Hh, text: r.txt, pw: W, ph: Hh}));
   }
 }
+function sortSlots(){ st.slots.sort((a, b) => a.page - b.page || a.y0 - b.y0 || a.x0 - b.x0); }
 function nextSlot(){ return st.slots.findIndex((s, i) => !st.items.some(it => it.slot === i)); }
 
 function renderSlotList(){
@@ -442,10 +475,10 @@ function renderSlotList(){
     b.type = "button"; b.className = "srow" + (it ? " done" : (st.flagMissing ? " missing" : ""));
     const t = document.createElement("span"); t.className = "t"; t.textContent = "Zeile " + (i + 1);
     const sm = document.createElement("small"); sm.textContent = sl.text; t.append(sm); b.append(t);
-    if(it){ const im = document.createElement("img"); im.src = it.img; im.alt = "Ihre Unterschrift"; b.append(im);
+    if(it){ if(it.type === "txt"){ const tt = document.createElement("span"); tt.textContent = it.text; tt.style.cssText = "max-width:46%;overflow-wrap:anywhere"; b.append(tt); } else { const im = document.createElement("img"); im.src = it.img; im.alt = "Ihre Unterschrift"; b.append(im); }
       const g = document.createElement("span"); g.className = "go"; g.textContent = "Ändern"; b.append(g); }
-    else { const g = document.createElement("span"); g.className = "go"; g.textContent = "Unterschreiben"; b.append(g); }
-    b.onclick = () => { st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); };
+    else { const g = document.createElement("span"); g.className = "go"; g.textContent = sl.kind === "txt" ? "Eintragen" : "Unterschreiben"; b.append(g); }
+    b.onclick = () => { st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; if(sl.kind === "txt") openTxt(sl.text); else openPad(); };
     li.append(b); ul.append(li);
   });
 }
@@ -460,7 +493,7 @@ function renderItems(){
     const sp = document.createElement("span"); sp.textContent = String(i + 1);
     const hpx = (sl.y1 - sl.y0) * pageW(sl.page); sp.style.fontSize = Math.max(6, Math.min(15, hpx * 0.75)) + "px"; sp.style.padding = "1px 4px"; el.append(sp);
     el.addEventListener("click", ev => { ev.stopPropagation(); if(st.sel != null){ st.sel = null; renderItems(); return; }
-      st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); });
+      st.pending = {page: sl.page, slot: i, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; if(sl.kind === "txt") openTxt(sl.text); else openPad(); });
     st.pages[sl.page].wrap.append(el);
   });
   st.items.forEach(it => {
@@ -552,7 +585,7 @@ function exportSig(){
 function addItem(o){ o.id = ++uid; st.items.push(o); st.sel = o.id; renderItems(); }
 
 /* Text */
-function openTxt(){ $("txtModal").hidden = false; $("txtIn").value = ""; setTimeout(() => $("txtIn").focus(), 50); }
+function openTxt(lbl){ $("txtModal").hidden = false; $("txtIn").value = (lbl && /datum/i.test(lbl)) ? new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"}) : ""; setTimeout(() => $("txtIn").focus(), 50); }
 function closeTxt(){ $("txtModal").hidden = true; st.pending = null; }
 
 /* Auswahlleiste */
@@ -630,7 +663,8 @@ function initSignEvents(){
   $("padNext").onclick = () => saveSig(true);
   $("txtCancel").onclick = closeTxt;
   $("txtSave").onclick = () => { const t = $("txtIn").value.trim(); if(!t) return; const p = st.pending; $("txtModal").hidden = true; st.pending = null;
-    addItem({type:"txt", page:p.page, x:p.x, y:p.y, text:t, fs:0.016}); };
+    if(p.slot != null) st.items = st.items.filter(x => x.slot !== p.slot);
+    addItem({type:"txt", page:p.page, x:p.x, y:p.y, text:t, fs:0.016, slot:p.slot}); if(p.slot != null){ st.sel = null; renderItems(); } };
   $("txtIn").addEventListener("keydown", e => { if(e.key === "Enter") $("txtSave").click(); });
   $("qToday").onclick = () => { $("txtIn").value = new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"}); };
   $("qX").onclick = () => { $("txtIn").value = "X"; };
@@ -638,6 +672,11 @@ function initSignEvents(){
   $("sDel").onclick = () => { st.items = st.items.filter(i => i.id !== st.sel); st.sel = null; renderItems(); };
   $("sOk").onclick = () => { st.sel = null; renderItems(); };
   $("finish").onclick = finish;
+  $("pgPrev").onclick = () => goPage(Math.max(0, (st.cur || 0) - 1), true);
+  $("pgNext").onclick = () => goPage(Math.min(st.pages.length - 1, (st.cur || 0) + 1), true);
+  $("pages").addEventListener("scroll", () => { const box = $("pages"), c = box.scrollLeft + box.clientWidth / 2; let best = 0, bd = 1e9;
+    st.pages.forEach((p, i) => { const d = Math.abs(p.wrap.offsetLeft + p.wrap.offsetWidth / 2 - c); if(d < bd){ bd = d; best = i; } });
+    if(best !== st.cur){ st.cur = best; pgUpdate(); } }, {passive: true});
   $("nextBtn").onclick = () => { const n = nextSlot(); if(n < 0) return; const sl = st.slots[n];
     st.pending = {page: sl.page, slot: n, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); };
   addEventListener("keydown", e => { if(e.key === "Escape"){ if(!$("padModal").hidden) closePad(); if(!$("txtModal").hidden) closeTxt(); } });

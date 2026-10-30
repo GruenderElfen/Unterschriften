@@ -88,6 +88,22 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
 #padbox .line{position:absolute;left:6%;right:6%;bottom:28%;border-bottom:1px solid #9aa7b6;pointer-events:none}
 .actions{display:flex;gap:10px;flex-wrap:wrap}.actions .btn{flex:1 1 110px}
 .quick{display:flex;gap:8px;flex-wrap:wrap}
+#vAdmin{max-width:920px}
+#tabDocs,#tabGen{display:flex;flex-direction:column;gap:14px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+input[type=date],input[type=time],input[type=number],input[type=tel]{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);min-height:46px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.g2{grid-template-columns:1fr}}
+.mlist,.dlist{display:flex;flex-direction:column;gap:8px}
+.mrow{display:flex;gap:8px;align-items:center}.mrow input[type=text]{flex:1 1 auto;min-width:0}
+.drow{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px}
+.dline{display:grid;grid-template-columns:1.4fr 1fr .8fr 1fr;gap:8px;align-items:end}
+@media (max-width:560px){.dline{grid-template-columns:1fr 1fr}}
+.endv{min-height:46px;display:flex;align-items:center;font-weight:600}
+.gprev{display:flex;flex-direction:column;gap:10px;background:var(--desk);border-radius:8px;padding:8px;min-height:120px}
+.gprev canvas.pv{width:100%;height:auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.okc{color:var(--ok);font-weight:600}.errc{color:var(--err);font-weight:600}
+#adminTabs{margin-bottom:2px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -112,6 +128,8 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
   </form>
 
   <div id="adminBody" hidden>
+    <div class="seg" id="adminTabs"><button id="tabDocsBtn" aria-pressed="true">Dokumente</button><button id="tabGenBtn" aria-pressed="false">Erstellen</button></div>
+    <div id="tabDocs">
     <div class="card">
       <h2>Neues Dokument zum Unterschreiben</h2>
       <p class="small muted" style="margin:0">Jede Datei bekommt unten einen Namen. Den kannst du vor dem Hochladen und später in der Liste ändern.</p>
@@ -133,6 +151,59 @@ body.nozoom #pad,body.nozoom .it{touch-action:none}
     <div class="card">
       <div class="row" style="justify-content:space-between"><h2>Unterschrieben zurück</h2><button class="btn sec sm" id="refSigned">Aktualisieren</button></div>
       <div id="listSigned" class="muted small">Lädt …</div>
+    </div>
+    </div>
+    <div id="tabGen" hidden>
+      <div class="card">
+        <h2>Teilnehmer und Gutschein</h2>
+        <div class="g2">
+          <label class="fld"><span class="label">Teilnehmer</span><input type="text" id="gName" autocomplete="off" placeholder="z. B. José Miguel Goez Posada"></label>
+          <label class="fld"><span class="label">Gutscheinnummer</span><input type="text" id="gGut" autocomplete="off" placeholder="z. B. 261D327746-1"></label>
+          <label class="fld"><span class="label">Ansprechpartner Agentur</span><input type="text" id="gAg" autocomplete="off" placeholder="z. B. Frau Müller"></label>
+          <label class="fld"><span class="label">Dozent</span><input type="text" id="gDoz" autocomplete="off"></label>
+        </div>
+        <label class="fld"><span class="label">Maßnahmebezeichnung (wie im AVGS)</span><input type="text" id="gMass" autocomplete="off"></label>
+        <div class="g2">
+          <label class="fld"><span class="label">Kursname auf Anwesenheitsliste (leer = automatisch)</span><input type="text" id="gKurs" autocomplete="off"></label>
+          <label class="fld"><span class="label">Seminarort</span><input type="text" id="gSem" autocomplete="off"></label>
+          <label class="fld"><span class="label">Ort der Unterschrift</span><input type="text" id="gOrt" autocomplete="off"></label>
+          <label class="fld"><span class="label">Datum auf den Dokumenten</span><input type="date" id="gDat"></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Module</h2>
+        <p class="small muted" style="margin:0">Name und UE je Modul. Sie landen im Zertifikat und werden automatisch auf die Tage verteilt.</p>
+        <div id="gModules" class="mlist"></div>
+        <div class="row"><button class="btn sec sm" id="gAddMod" type="button">+ Modul</button><button class="btn sec sm" id="gP16" type="button">Vorlage 16 UE</button><button class="btn sec sm" id="gP100" type="button">Vorlage 100 UE</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Tage</h2>
+        <div class="g2"><label class="fld"><span class="label">Pause pro Tag (Minuten)</span><input type="number" id="gPause" min="0" step="5"></label>
+          <div class="fld"><span class="label">Summe</span><div id="gSum" class="small"></div></div></div>
+        <div id="gDays" class="dlist"></div>
+        <div class="row"><button class="btn sec sm" id="gAddDay" type="button">+ Tag</button><button class="btn sec sm" id="gDist" type="button">UE gleichmäßig auf Tage verteilen</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Vorschau</h2>
+        <div class="seg"><button id="gt_anw" aria-pressed="true">Anwesenheit</button><button id="gt_lern" aria-pressed="false">Lernfortschritt</button><button id="gt_zert" aria-pressed="false">Zertifikat</button></div>
+        <div id="gPrev" class="gprev muted small">Vorschau wird erstellt …</div>
+        <div class="row"><button class="btn sec" id="gDl" type="button">PDF herunterladen</button><button class="btn" id="gUp" type="button">Zum Unterschreiben hochladen</button></div>
+        <div class="msg" id="gMsg"></div>
+        <div id="gLinks" hidden style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+      <div class="card">
+        <h2>Unterschrift und Stempel</h2>
+        <p class="small muted" style="margin:0">Liegen geschützt in Supabase und werden nur nach dem Login geladen. Einmal hochladen, danach werden sie automatisch eingesetzt.</p>
+        <label class="row" style="gap:10px"><input type="checkbox" id="gSign" style="width:20px;height:20px"> Unterschrift und Stempel in die Dokumente einsetzen</label>
+        <div class="msg" id="gAssetMsg"></div>
+        <div class="row"><button class="btn sec sm" id="upSig" type="button">Unterschrift hochladen</button><button class="btn sec sm" id="upStamp" type="button">Stempel hochladen</button></div>
+        <input type="file" id="fSig" accept="image/*" hidden><input type="file" id="fStamp" accept="image/*" hidden>
+      </div>
+      <button class="btn sec" id="gReset" type="button">Eingaben zurücksetzen</button>
     </div>
     <button class="btn sec" id="logout">Abmelden</button>
   </div>
@@ -334,7 +405,7 @@ async function renderSigned(){
     });
   }catch(e){ box.textContent = e.message; }
 }
-function refreshLists(){ renderOpen(); renderSigned(); }
+function refreshLists(){ renderOpen(); renderSigned(); genOnLogin(); }
 
 let picked = [];
 function renderPicked(){
@@ -396,6 +467,8 @@ function initAdmin(){
   ["dragover","drop"].forEach(n => window.addEventListener(n, e => { if(!dz.contains(e.target)) e.preventDefault(); }));
   $("refOpen").onclick = renderOpen; $("refSigned").onclick = renderSigned;
   $("logout").onclick = () => { try{ localStorage.removeItem("ge_rt"); }catch(e){} token = null; $("adminBody").hidden = true; $("loginForm").hidden = false; $("pw").value = ""; };
+  $("tabDocsBtn").onclick = () => setAdminTab("docs"); $("tabGenBtn").onclick = () => setAdminTab("gen");
+  if(TEST_MODE){ $("loginForm").hidden = true; $("adminBody").hidden = false; genOnLogin(); return; }
   if(!configured) say($("loginMsg"), "Supabase ist noch nicht eingetragen.", "err");
   autoLogin();
 }
@@ -522,7 +595,7 @@ async function detectSlots(){
     const vl = [];
     for(let x = 0; x < W; x++){ let best = 0, cur = 0;
       for(let y = 0; y < Hh; y++){ if(dark(x, y)){ cur++; if(cur > best) best = cur; } else cur = 0; }
-      if(best > Hh * 0.12) vl.push(x); }
+      if(best > Hh * 0.08) vl.push(x); }
     const merge = a => { const r = []; a.forEach(v => { if(r.length && v - r[r.length-1].e <= 4){ r[r.length-1].e = v; } else r.push({s: v, e: v}); }); return r.map(o => (o.s + o.e) / 2); };
     const H = merge(hl), V = merge(vl);
     st.dbg += ",H=" + H.length + ",V=" + V.length;
@@ -787,6 +860,381 @@ function initSignEvents(){
   $("nextBtn").onclick = () => { const n = nextSlot(); if(n < 0) return; const sl = st.slots[n];
     st.pending = {page: sl.page, slot: n, x: (sl.x0 + sl.x1) / 2, y: (sl.y0 + sl.y1) / 2}; openPad(); };
   addEventListener("keydown", e => { if(e.key === "Escape"){ if(!$("padModal").hidden) closePad(); if(!$("txtModal").hidden) closeTxt(); } });
+}
+
+const LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAAbgAAADOCAMAAAB7GOfpAAAAkFBMVEUAAAAAO3IBQXj87NIDGmYfeLgDYWYCMmIidLQEL10ffcIhgsgjeronerkAAP8Me+2gpbAujMtWaYwA/v4lkbUBFTYogcJRlrNTltEtg8MlfsBUba39/f13hJ0mfcAtgb1sbW8NQnIjgL5wfe7/AADGwb0KQXSnp6y7vcAAKLEqgL62tv++wcEA/wB////BvrzJTQi5AAAAMHRSTlMA+v3+EPAFoRJa+v2jXwEH/R79ARVGoQoOV6EGAf1iVQNT/gUB/p4E/gOcA/0BAv01OJ2zAAAudUlEQVR42u19h4LiuNKupZElG4xN2oaO07Oz+aT3f7urKqWSLAdo6HB/fM42gzG20efKqSjesEmJL0LWtVKKuU3/u66FsJ8Vt+1zbYiaFLVBjMebwa9G8G7QfSrYgJpqRSFj8D/4Q+FTiJ24Ldjn2YSyoCHBGQQds+TcI8oY0J1sbwv2CSDTQNQGGPvXQsQtgIx72HA/kN2NYX4GPmlgYxYs+/+An+GbgRD5DbpPQW7C8kLm4OOOypiVcYb4PHqwRzPMm6T7UKVEKgMTdzTHeFBIHJrcSzj3qZZ1N6L7UIpjlraCWuLeWAqLWSX3RzAlb8h92FZbLhn+Ej5pcQsfeiAtijdm+ZG4eWrjRMR5DZKYBeG9V1nqm6D7KNxiO63nNCH7/XH+FZG7ccv31ydr6hqJAGNBU6EUFuxwS6Y3mvsIfVJ4JZKlRhtxewWd08u2cKB+o25L+f64RcKMp55Jp0xSAIkC6nbVt8V8V0YpCF2x+JVHNrh/5+ALwN2Q+4BNsUgDSUgtVisdRMEAZwTQm4byftvfKOCIXuLVfJ7XKu0nzLtYvGyEXeKG3LtsEJNRPQojZEcczcRuY7G1FxQUjZy4xXneJWhaB4PNIUI0EUaFmkfMu1eYp0yvjqobyb2LPqlYFAUIjmOiZ8bCz8d9Ylz9Jzcx9w641YzHkVGeKpUUQYJRdIgjO3uguNnh7+OfTKM4PfRCUCAxGBiLbXQD8s0Ofw96C6gFdTF2mpBwQKpbMk4M8OCSvmmW1/VPCkphlI54FEENQi+VepG9QL5y00/exV8SCasElUj7IKzSO1NoeCeYdrdchmsSnIpsN2oRsMTpFYI3jMbGSbyVxV9RN+CuGxDobYm2kfJBSqMkjpBY6khyt+3aBJeJ3/jkZR4H6XqWHeMZ2oTt5mx+B4JjPGWKmXBqrER6lsriiEI45+ttja9NcBQixtdEZGW5JY8dXLG95yH/P2cRtJoU3kElE1kJp9d7/W09QHBUeySBuFSxcWxXfRYfupTxD9fvxeUTUt/RZ5LF7fmb3rJKZTZ5KMkDi1xg4pPkZudeL39vuiYN6puun3XTMc4zC/4Nt3Vsf/diPony2bcDLxOXa6WIeIQ8Y1Ggxs/W8iH94fsLszSDmVmSK9OeGLAFvrltm4fOZzKHCp4E/ICtevMzHG42rt076WeazTxFwoSwLkkYLZak+SiXujpwdY6g1h64b39tafAm8XAx6nnmLA4aeAFYtG8urqxDETPQzemFlM5NwCC4K3zu6OVUJyQBX2j9Dr4+lbq49L+23+i23rKemsJIAJyqJjRa7hmpPB85+PVxSawrYT4tYuSB0jRWURxVcWGKeyfgcsaAE3Bke+Ysrm6Mq3X6kTnmc2Pf4q8EtbpmjDzJfmFOZHPKn0KZYIg/T9FeUsa9H8VJxlP7m33LbMU28o/ErDKKtfZZ77mCRGA2Bc109xVC+Pakx3MQuAuHNd8HOInAxT4uKuC+9XkmRSmTednXKt/gaDbZFI7CmO3W4TE4gZIDF6uRjq9DGdLLuesD11MqEwHXBy9U6QxZCamBwM6O7vqaLuVbqohAhLOBk6GQBa1KIT3BXTot5t2Aq3t+yG+T23q93UZiZxBDKwrl26r0mEmLboXN91N2deazYOEyfc13pCU5qHG4sJ38TsCJ4kcqr77N3tbr9fNWb7yvOzCaqneWCU40doZ2siC2uPnotMBDHWNtVMDL+zfeDbh62II7a/v999//t15vo+yiM4AjVhHv+TdcKdhp5LITInSFgO4E8Pbifql3A07FgbfttwttkROlPgM4j1sWdmWAO9EiJP4WcaVmSNcCrh0w49gcxeSkbUtM8z5pTCSnSy/HsiXlosVqsFGlpxV9q1DEB1zDDXwx4Nqei1yQXnep/f3tghshuQg4t35ijmtxgKxs/m4fGUF/d4RMq13TPec0oiv6mIsi8Y+KMZSl13jFGHCte1yHJIdwJ+rzAylfk6gGzRNil8RNRxYywLXuFuUEwRFGOZCYFhGjiFAS8VKLBEMfkGuzBlIbuW6y/45WO/p0EDgpouNk71Ht3X8k00FHq8XBXc8Axy6kmGTEnGOVlOJN6GNEo4s0kyGWQ8jLv0KohtSvGK3GP8TaU+2v6Zpw2uBOuri12Sn83WJASAz0YHIecDhohOLcD7etIkWKKUbyRKTzJoEA0zANoKOs8pICLpCcMeT8U+b6unFeDgdYqYdqnkIqfEdNtMqFc44JD5mxUQjPFm4dI6IWvssjYoyum9BkTuZgU9SXpPIeGWmxCHWhdVGIzP3j47xT3jsQVH+HHTZMa6k5wL5degs/yMGm16GMdg41NprglDHr8tFLi5XwlrteBlwQ54JzwFUWnvga0p3IlT14j9tA8ZGIDqHuuBg4aeCNLN1g5ITLoitVeMXMLlEEnOndRD0nJlnholvpPZZoQMnYS8NmOKjmKWesDB3GWBQX08tAPnSWn3CVt/4rrXOxMXpoD5QEOWlbZ7H4r11zGTvvkgO8x84oYpzgSaJD1L0VfFQIuvdVXlrCQTDInxvY8g8Wt3AbdIQh//ZLJeYVrofloPFMRZsAEpM9inl64ARZQK4ki1so9UxK6XVf4JE01hsD5x9EcLnWtQpnM0FdejP6jmvylpZ2bI2f2FvG7GqcMuiV8HA5ZyHbrq30e5oRPZsBnEB2GHiripaBfkh8LbXqAYd7VdhLmWmOAYYV9y0mRJ0BjgSRaqJ5EHZCb0YJSpQuPw1upHQBGkN0wR7IuZJL8EWu/xqH5xnclXy7fV73hZy9jHs+mNGA1hPBHirixIkRbkZJrE5EJr1m3QeO7A2EVNcRxqIniY1ctSpzHzghAm+0unCf9apemDgAV7RP1FjbmqVUf+SN7210pu2/x0N0/orPWb8Xk4zAZq895AeT83STmOYKlfN0A2sTRrgnwAnKoTxwwrhk/OrVaXczwgH8JSmasgh6hQxOoJh7+EwlR3IiYZeB6INZSyhrHacflAlsSVLX84Bfq9dHY5toJzQnLNJaxCBwpycWCMogIXZn2JFZGClq1qe4YORHFEeoXRmDD9wZqkeyVHBRrpAC5x9D+hC2SSi4LSQVzELYhA1BQwFECdmygfhp1BzPCuhBhT+Jy1GItzRiRK4wkUJUh8U7Izeh9nEba80SLTUHHB8CLvXT4M42wyhFOwxcIExFpF5ChBFwtVsEVccN1rZZrxTd/axVaKCdNWD8l4l5b4cojnEjBNfmuOhEW5qot04s8xkC6xzgFLj80Acpe1rdCcDFCm3gZLLXHDK2WBLgCBMMosHzykCsFclC07ffyp5hGwuzdYibRXii7hcpKoPB1PhtBBB5MBj7d7JbjSbFD7FKkWx9gRNyHIKUGWWVQ8CJDAdkjk+InkY5FB1QwU4JW53+vgCco19ZUINCpUwvFHY8z8FpTlg8aw+wNOJj8xsnKa49jeJysb+zWGUCHJGHIjEFxBjFkR3/jXtem53uqwG4bjiNI0bFmXSXd5wE4GLcvrGJPBTSorZHcXWyicRmz1h+pwGnBoDjdK8gimY+HsdsqntgsopuqSVSDZxuSMgFj+I1gUtwsyJOnC7jQL2i2UlkIfPrPQEcPx84NXCLMXCS/pa+mQaPr/DprWPA1RlTe82uDlwuNj5oWkc/NlpTAK4MqbssZEkT5aS+EnDR3rYYijulrLImCb2ZXDgxBzhXmZN6JQ0FXAO4b9nrTXRoS4ATvSFNdKv3fRknhgxDfoIdNyrj2gFnTIZV5hwDkaO5iIBjLB9XLoMCuebbSFlYXwc4Yh+sraY60XSIhlFzvkrq3RJ9c0CcABw/EzhxOnB5Hui/Wo0Ah+6cwLrgwHUgjGsBF8wPsPlozGA4YvMa6gN6Dk0ho8qbPnAjFDesnIiZMs4CJ+cCJ0mgY1QtHlNOZPAnr51qt/XM8nrABbujxIt4J9uwz0uRqFgmo4YaqzMp7gytshhWTk4CzlNcsDudERpiweMyzofht16yMU8N1wGutLIzXC0Y5WqOWin6GYXU9s0BJ69HcacAJyIeO5GHPyLjbJbCH55Xmvpu5qy5368BnGOUNv3E65R/WMWynQwP1MMiMA9czgAXU05mcYKMkylwo3acYnxOhGpExoEGqzdBHM3bgNw69UVuIy1zu53lKekdZ0/7F+HLxvpW402HBnI3rDwfAS6vVYoTogNzZFykP8204+YB12eVtqBKJxEQhWHLhrJgqeqi1YkhJzPw2BCrW7MBjsuC3W+tb5NFUc3ilfJEVjkfOH4CcMntDFksI56Tc5UTZeUKje1s2UBa3haD12tbRjycu4c0WwLZmaB69jg8wTMJ0dXuKRpMmiThzJNZpRj5Ri7p9ixfZS+MNBTWCQjvxIAtMM4qsWbYJ69tp0y4KMcmdVol+UAkascGqgj8BS3Zu8dITqciJEicB1w/ov4WVhnxBDXuZFZswCaFp7adBM4wW+iIJuIQAWcDQdKon9Cwzvkc9x0a8HtFDwrmmopRXimJlGPiBIrL6QCkEoGQxxB3HTIHWOyrzKdXiBS4KJwfJazAKYIiNcIqnTqQepoH+WDIJuFjpsKaTxyHjsUkMKCzdUf728uIWUYLO66c5MwBkeiArSnryCcLjcPp94rk/oStIuglC7UicfToTAghC1udGZJih5UT5nzpluTWlCCKoXpvSN9aT1cWa1daOXDcmpL0llkGaY0TNcPTHFbmTHNAV7GyvkSqqcNQnijjYu+xEq6cRfSyZWTkoqsF7UvAQj+KcIdPmYeOs99CcIdTPWR+2cCWr093njxH7mxZCM8rf5tTIYfWnDBFUvDAsgxI3tDNEjFNl6yFrKRQdDlJveN/gvou/84BJ0Mf66ACQNhdipp6wF1NlyxUnO+HEXAVcVn6m/4rMta38ioRVUnYCdmwa8ZOy5wFb1okUEtlQt+P48EdYrvicosik/pYO0FCk23GybcfFDOKOiYMiCIWh6Lv2FB2rxzIqCPPWit6raKi8aSeYyR8mwpXi1VtrUIR5W1tT/BUwrGn1g9EXBkITnqhOzZlTiQFFXWN3r1a9XP5BY32hBZ5OfOC+Rl3qqYFGHFOgc1e6QeTwl6RJuHaUZU8PTAPcZxlQdOX61TEhXQBm3viwy3eozgvwHaa04s8IYzTPNh6ahSITPsKxT+be4qre4ui5BTJ6Ue77hXP1ElNjULeUKneydtM+rGJ69KTqmisQ28zd9/2YoxRQZegqySFjFoIsfkuZpZkzs4gUf+AGAe3FP8hUd1R16twxWdZThMoguUiyzI3OigKYdac0gvoCTZeGfoiRdM0SBMJ4bPsoowE5fpB4DnKkNAaidRYJfLnJ8NLVdIGNk7DpcxyfYLEej4z7WvL4hnhhzFHc1Q3GLXwMgBE/DAbWZYZ6g1t/2rLP8NT8aMQPRKyRQH9vSJ9sNxJo1ohJklTMkVn7uGxsmdlsr53TMVWU2V2sDMKp86N/6CAK6mbQU130mhFEYm1qF9lSOP/BfK9fsG/9S8k+SumXn8aV8nrkq/q2nXA/CVJIfMVrXb7Bf+TaaGpOWkFtyuUOSF8WUQtFIQvBUpKiUXxSzZ1LSxSeAx1CwIo+Du5zQLoJv87P/2kZBUpmK/njCUQcVoeediL4oymzEKYphMX6nLikBXit4mmtSJp2SFnt9+IHUwaQ0Rue3J87cw6ul5vKOnk7pwCuKQ5hRxPbx7obREEvkwaK7gmYQOJ0mMnF0n3BTyfxMOSpg7U3SXH7z9RKpM1+sFoBc3zem7yz1lpzf0i6tZqujOfPUmbJbyFRK7RlWb+SU8dG1vnHm5FklUHC6mi7a/TmkatGQ2A99jiq2UDtwm4E8D1Ah4qlNGUs7wn69OAc4qrLdr5I9eO6janbHIoRC9S5Zo46kBo5OAYVyq55n+/6/Jhvp2Z47W2Knjm8jfgihmtzvsBD9csw1pHz7MaqwVzcz3DAGC+C3dG768nnF63bejZlq6HBZvXWWgddWSe1T8vtBES+e609Y3ipoDL1O5qIlQntRYKLX2nvS1xMxw5kL50A27SjNvntez65BY16/X6lI5QtofRAHC3idOTwOXto7Z4rdk1Kq1s+dYAbLZ1/gWHqA7bePJKg6veDTgx+LPkj4v3GbUFw/IxOBXSDN3q/N72/Ul7MxqtCvElgRt+tKXT8C5eG/fHqFtOXgI4MeoTEcFJfJXe2e8AXDnWiE53bB0utVqfzylrIccrHfhQ7ewJLYula/bY01wFba9FOw3+f0JxsD0NZqM/T2iQ67xhgJxyHADxdorz3UJzJr5tE+lmzLP3mKN4FeDkVB97NphlPpjb9cwG3GBTRD6mM7X15CZ8+hb3YdYeLGHGi23IfvGJLB9OccK01tuOZJnzfgDBNuHLsVjklD/Gl2mA4kSUspO2HqRB4iRmnQLn0xWUYid1dfsK5oBfrT8HO3atQ2uvUvc21NtfOJ3FzQHPikbkT69FcSZwPh0gar1Kkk9cIg7t7lmnbUC5z+ESajhf9msDV6Qd2tI0cx73ZQspadtB1WScU7ZDBjhE6tjQzKX+OAKRB853rVM2X5LnCyW/AHByYkz22OgBMm4z6XK4/jaimowH84cNcFHXgx0mOAVODBXqBC4qJH37FYETEyHLetx7st72MswGtc31DJ/IRO5CthzG9y+jFJdr4yVCuyz6/stFkWZFvuT0tA9o92sqQXTH339P+Jd/DLdZI5mV9VCGQT3Q5kykpdf5eo+kC6uVm+qLaZVzgLNJo9uLjYqY8DCJ0bDOAHCtbYNL5Wee4lQqDEE/qav2C4Z1JhSqNslvfmsnqCn9TU4AVwxQnPk1E8CFgjP15XNOJuVymt/8ttlxM5iSGqkDHwOuZnyCVYpMvT4Z+/fFgFPTKXDqEkGCbVSUcyYDHwbOyEZKcWwWcL1RYzNT9fDIj+Kw83JPrYL+RjG3nsUo9bZTI+l5YxSnR/SEpzDbHDYCbix0JwfGxvf83eLDgIPK/XYms9y+GTc192liw9GaQeCiZOZMFbEgJZ76Tv6TCz3kM56FLEQ6mdMf+BF89jfGZ9ow6o0Tyf5t5+ZMMhcxHgAXpL2QmHKPZ8yBmnbxF65kwJJOqCLJzIWzI8FqHOsWZr7VH2MBzk9hfBtya8ZnX2mqsnGY4uJxhj1WKaL5RHHtkjCYkqABRcR+09Wk2Wl3tiCv/jQZscM2wbnIrd3AdjnzngaTvEZZ5RjFiXiAlSschhiTq3aLZ1yEAOxO2XiEmWblxv75A9WT+KTaSeBg/Kw+iCaTEmsEi5kqrDgJOLSr1dDsq7qQNMuXzJL3JJQr4/fISYoTSyFOh7G8p3YiZ5XFCDU2TmcykXJumFmMOlAHKE6wXPEKZZW5Cs/gXva4YdcKxeKGvZFnW0Sx86GhBu/lZpZzkHu1NQWntTRxYTs57qKMPZVjZnofOFAW2RBwtGGsCLO/VCg6I40Ski4zfiAgGctn/8Tj/N4/UUzNKf/0w9UVH4m1DYXs+Hw+Oe3NiSjObS2mKoxTXBqlU7nWUNiqqBXBePccmzYlsf0BaL7Re5Oc7cE2j0dXJLl5LnRhHpmfgTA9VGW08WFkDlAlfwZw7d9tsONaPWNIb1SNccxcOsIMMYRAv7ZTiRBF1HTyfUmutUJOzGdiAbpJhunmP3LG5toCrRdxxTRw8WCTGaySNvxSvV6K+qptG/NjMqpNRV2FRRKpeHf1REw28gl9DuxYiR9qKsyN2/+efV6DqowFNAM56aw4OQM4OjxwHqvMA5cbHNbLRenP+KN+GFYVH1KUOuWyN5373LTnmswR3mYLPdYuY8g+FVbxnvbD+wdJFDMaM3NOOpLwAXNgArjQ4FfnxYetTsYFEvoVuXt5b/+JmMMrrST2skrPOWc0SUfHvddr3S3j999/X0MsnIdMHlgNbC9oMZRJ2v6JxkAGON9NJqE4MRnW6UURRJELlI/OM2Nph9j355WDpCBNFpuzV43eUNVxp9h8+pX25EnfMYs7RxKecTT6rUYfoswAr9NlnNcqSdPK2gzfw7zaOmWMeeDUR1HcUOeFPmy+rRTcuCxIM6OBzTafc5Ujfje6b8W5IjevVYqcbjxXxrGR+UQuSiEGgeMfBpwYUfmkiXLxMJctNLcEslMDY7Swc6Z0J/AzYKx6iZmocrBz76j+GQGHTTsxTFafq1WmzQf9D50L3IdRnG88LvJlVo7aXBs3HymzkangN/d8E3pSVf6Q1rYP5i5p3EKXZc6KT/hO8y4vLCoa8VWKEYqrswm2/ueMmvMfC1xePcGlrRkZ/ByGFiUR4ydq4P0hkmY/tkEdkXxG+uWgM7cy5oYYAA46fJzJKuvRQW7KmWyfj1WaxuOJ2wtWP8BmWZxX72Wc6Si82x3pZR8XE5o5pUbxo/aXql/z8pa9FsWJwLXYjW3YHJhDcaPR+U/IKv3oAZGYbSpEPgKr7Kcf2LbOuvBDb9lwqXSxLIse9//WHQHpKphBduPegNPjcdMUF863Ox24D6Q4VIgJyVnYOGFvtBlnFAUSjkrKcvnrcln2m6oJ17gzdNMMsg4NO9dNzj1B8hzg+pkGc11eNZsxgm+C4j4qhd2RXGtK3glsti03Z6HREL1JoRsTm+5RSyA4/Zf3Bz4oTop6OImNeMPONud3D5A8n+Lo+s0Gjk0v/mdklb6ZrQ0Uk8i8k21R02PCy8R/pOkoa3FD6BBn4kNzOqVPHOC0ns0yzIhlt5dgld4jMs4q4zkTxRcDzi2ZiKztION8z2P7ifQtdFPcDHLE++mSAoJLMcoDsKxVBufbRGRrLMsLeyErkeiBUxTn94x5bCdk3IdV+whLJhY2UqjLg/kVBhq4odeij5tDLgQqVVBJXDvvqGm5Z5jK8OG2OBc4fEjK+jQZR8eV9hIqhfjcFOcSXo0nOQrRk5nozHM8szYylm8BOWup2SefVP1atktb7XkarGvGZ1SGjudVKqqUzs1krgeLxUnP5E/KKsO4eat/cF8eTyw0rxRaTGwiQx44l2FXc4J5wirJWBKnuFZyTjhjADjBQkhoLsVFo1LS5Ve1b9L9SVllflxI8NtZ2nPKJd6mchiXv6as0lkFOh2EpQTGcvEEZ2nUxQzgBoYICJeuIk6y4yTNSjBJCW1r5ocpD/pnpThglnH7CapVpqNQDMkZ1gajKvoyjvlkBUHUkgEvPPcEPqMGS/ZnH5GJeTzomrOLPuKHto67oYyHdcTHA+dHUYTM6kAdXjyRWTGF83LAO0pyqJuwnRWarr8zCy0u0okqnOgsQsi5TB3L781mdQoRWZkUuGCayEyZFZ2P5aNyomaRktuGsyUzpdJrfIivORotxIgNHiGHCrzzTtUJyS2timHCfIIRyyLhmH36npMyOzALXJhYr7MDIVyboUw6tC3EloTMTgzjPtzaUpWoLkidyMBE1Pd3WbLINA75AcnP4koZfIRISA4JDn+FirQSPjBOLWAKX6ume3TFU1lICNw9+70RYZT/0a/XItZqYt7NIkb5WufOFo0hKz5qM43yeq1DIoqh8sp4m2VCckvr0mjlIXF1DcWZvVLJ0hkY+SFW+QY1kX4heyO8FNChVMmPU16REdnoN37LDgSjAwENX4yuwXszzt49MMdSjuZlX8zYNB/0cx4BuaXeCMFJ/xhzfxqepbigqk5V9f/g05uZNKXinaZpt0hDpSWjz0RUERKlU9es9zXUhcpoL/8oBYXOGuzNZqOpcJwO7SWpQM7Sk3S6fPwdli114nNMb+z5O70Z7pYbHJYjq2SwWZIxI4ZircIA1zvZhzW5UZYuYvKivsYglQKBKBr7oQ1ohHeU8AEZNxTlG4BOzxSb2lyVRrJb5nb+Ivoz6UhFalD7ky8a6Sizez+I5hTnsdpAg6Cc+lGS6YEEih+t6J2OsT4Tjo3vD+/JZG2Kuv5h5sOJL9SzZhfUK06995y4LR0FMhlZVtzoJjyqUxMhIuSDcXTKIg+sch5uYsZGul6keyfGkonBEWenjyH7CNdXzCqDY98TIA0RWHhQNUH1RL95irQdGhaiEXAi/j5Rh1Zt1FfyC3a093Y41SN4ki7izJkqeIycPYDAiVAowbPckfcHKN+2iwRVWW+2OGeMx9qmcj7BOgXOkc9rlGFC9ZHEjlO3cSyXRY6HAco8lnW0XaSKXCck11kwTg34tCeofxZuuF2ymoC4E0mkjsTCLUe0Bnjkqvzptc2IL3LO+1EC/uV6RX5ymksohJp1PAqnVnBwnCwkSAEHo88Az8i3G26X7qpH/fik6iMILeG1mTIFTvrkn6D0x6EH90cV8jYM9cJyjucCHTy4ng0+NU+BszkpNYudLf5fNB53GxN3heIrihynqQvWFFeGIZZxJNXnuYVxmixK1CQ1BF9uwsaXQM7rJjSNKMrsEXb4Dk9ShXQpu4wzz/taJT4HN2q7hg9FpfE5HusX3MVKegmx+EFNnWdxuMEiqcSN3q6BXBISjzO9cP1VYn57IfcDCwFcZX2UquBr7ZnanYfbTmaGMLbSfjYSKN7NOndueGV60O7aq/+mS0jCLoOXmdHAqs0/psD9aoRcMOM5TUIi7sr6vPBV1ZmXXTo2rkUveXFTUQtX/z1c2c5NCxMWJ8SaxA8VZ+XFuX/87Dg/dHzQ2zEtZ60q+pIDvKpmNJHRBx16+w6jp5LHKzSn0VcgT2ZX7U5epZpllIsQ3TcqyLLsaSfCGwCcyEVPfHVxHpuUxarBqzQVOUHbVuVipZ3e+uUlm3H0WHwvF81UMlJX6JNXRRddsFmUm12bHLSJDrp4dK3Sv/DpxFmV0zoKiV3ragOeTYiVNTEAWOL4wqyAs1hapRdtsVguF+WiJMhVxWqxKPVarvQnjzlu2RWbxfJhCjh9+mUM3K446F+0ouvWIZTuoF1xvL/bFD8vC9xB/0oC3Ob+n+oM1iRYPK6NYFCqPHD8j1xalzMlzp7QUMGalc0KqE4jpOngZ6c1nGoDpNYgxS0b2bXdI+yt3NwV/U8NXLkwwMEHZtW7rit2/p07vwHOHbU7NvYZaS2H7MxBG/N5J++Wy3u5p3wNLtx10l27cv/q4BwbfVO7wAnhc/9lezP6YdA/D9/pr+52+3K5eJLyDOhqUnaV+lJ6Iu7X0mqOvD9Z0VYPnxksfkQWssIl1o/kyhBQ54SCk3GtwcAzGPNP/euRVdrDi7QbfUxx5ijDIe2ZHb11hV7Vzn1vZ+gv5WnSk2f46/buZHpv9oPK8n0AbmlZpX60ikf9Y880DGwlfz57hJdlTzvpZfN52N4wvBmlS2N0g9VS49AdNhtNbff3T/vNpoMJ4seNfnwr3LtavRxAzZTFfrW6B4ozMk6/W5lnHA47vLy8bFzRPmGV+uurDT4Em+NGwrUP8L3XQmrg4CB9TvjeHijyfrMPJAcX3hd7uBG4I/0txO0Jb+pltXo0J98bTRju5uU3vIHWXdQAh+80re+Oew0c/rBzVDkKHY9N8lyZVa9QgHTyOt88AYLbdwfEUP9EDclieb/SMq+4XyI9VQv9ojFavnyHPIpFBeu8KvURD/ellnF/dz8byLJYNAfNynSiRYX5FitPhwY4+WiPOu7sLg2U/mFLQ+awp8HPn4rv9scbodd2VQNXW2yQvuFJg3SO5ti1Twv9LTxrpV8W+qWtuqcV7kFeXJkbXTSa0R7017VQ1u80fzHa2OLunJVrbfY3z/lS4iorV/YRz930LRbeoiLD4mndQz+SnTTSplsscGmK+8WCAKcFoV4N/ad5AtrEm1osENpGfwBfgX/fLUt86Lyi41EyR8E39nCUvphWe/QZYb13cJB5WDXiqwg4iZ/h1fX9dOQ8sljYby0b86JJSj9vC7Nij+0eD4ZLNBukuIW7tcYc05ynyLam/VNaS8BsotCvDjz9D1tnlXQnVPXhrbYN/ASq0gNwmos0L/cA3J1VThC4ZVN1oGmihaBth+MKlxK1z02xaYB0ijv9ZqWf/8XSikurnKByqr9pjwLgNLcqV8dDgw8GrOrLvkJANtUdnqSzN4RCuLJXg2trRPGkTwDLagOflKs9PIJ4u/pzex04ePUv8+ZYggzv9FH6zQY+mWWFDjNM0w6ceLGwrrG30aw8c2x9gSE0sKxAV4/F6qFpmrLpNIXBL9Pb93JJgVss4Cl5gGVBQ0FvDUALTzUswAEBuMMF09xu2XjgAKXfDHzIsCxwL0ukIOCuR007sN+wZ/z8mNzhzryaswEk+sn419JcDelU3xty3Qb/bfiEPhhYtub+5dPRKmErYONG4r3NkSJ62LFsJSttROd6hr/Zn4zLCrpJgQJmWe4BohI0alA9/tEHdBY4jWK3qTRw90A9+jubSq/BQ3HQj/2d3hqwDWDJQalfEeAeYKm1FqePah6AIl8NcHAqfeiue9Hag7601vllBZZh191pidZ1li1pwF6q6u/9CoB7hfM08IzpN5riFhst1YDIqr18APG1A50FjBtAGclKS97VfYXmwNO+q+4Xy5dip39c+drJN3YhMgDmmlW6Au+4k14tLjWuC8xscCjoV1gM4DUaokZLh0fNKtG8rkADQeC0xaRXe3Gv/+jfrjnZHj6qQPph+icY6kgrXUGBQ5QOpT1KA2dlHDH4OwTOCNQHxHqhlVNrsCBvlJWxK/154HF60mzgCKIObIlNgRxR7B/wCPj8uCC+A0NjFUgATXGdPuuflwgbSDfcaahXoKFG5UC7UPCmMlql9ZvjUm7gwd7jLzTAAa1ZJwkS6L3mh8uXVhuyBjjQ5PWmH32N5R1KmD5weyNTYNtXKXCdNQcqQ9ioyHjggMaqttvvEDiglE1lrldouBE4c98FUhxomdqfgBT3E023FqgQKG65CMCBjMMLtLu3utCl622oU+37E6J0oWFt8u+hKO1iwdJWP9Ao+qVez2MMHFhp3b5CIrArainuHqXTRn5fahn3WAaBNAicRGXAC/Y74MkgDrWjpT2AaWgpbhMortt7xybgURkGfSTn0eJxsUyBg6M2IOMWDzv4YF9p6wV82oeI4uB+jp28WOs27//YwRQ228s4Gmt44VxuwyvNGjVOLbMUB/9oCxRkYMdZ4EDGLczqWeXEOlz+uTP6YgqcUScaq2c2d5U0FIdA4FmaA6G4BuFfbMINah3+WKDS1NirdXCeF5RxKXCaWL87jcYoJ0DuJTDZRQKccw/Ji2XaZ/1XopDXiG138BO08r2p0LaxomQPuhisxxGM5Af0bt1pJVqrgho40Nrv9j9BDX8oEPnVcd84fTEGDmyp8vsGzYHV8dEo/3egiKKLrdprvquN7hL3OOAaIBvjemzxPsqV9gkY4wM0/EOFz8ExBg4xRfMGrdNm0+KtHfZosR0j4DbAaIwGpsXg7sKtE+121ThmhwuIpnVpHntjI6PGbfc+FEbSbSyrtKaz+ajyVm55qAxwVDnZGPs52MIlSsIFmna4Q7PNFqRV5VhlB48HLHNrbnAFwYvlsikdqPC1RfNf+YSWhDTkuoGzrlBmW1tef2Zsd414ZX2VKLrNaQBbsBSaa4aTrlqTUjXoTyi1el925qGvjFMFlsvacchAK3BHAadCZ1WzAaeR9riAI2MBi1MV/6BFUawWLlIn0QREE9x6n0CGLQxd4h7kkSj17FNzlNpZqRH+04fSGqQPBM5eDYKHYCnob3ngjNGNJ20qoMxje4CYBx6MFuR/9SVefJgRjf3SOda/InLW91ps9gBYZx0KesFW950NEhwPG9x7wGMkuocP6FIurJO5wiyHvXFHPG5CYKU4VMa3DK5i0792s98cgJb2qxe757jfPOKh9owVuoZdlEYbjX8W393DYPzJQI/a7QxUua/2P1Fc6bNK+Ngchby2cre2q8zBj5UJd5izfIfnZvc1gdNuSsOau9xI4XzCiYM2ercbimFGRxFBvaE5SZGUaKkPriwfUIkBTrjR8Tdzc7tB3k8vM3hr9vNm+WUJDn/FYb/v3A/cectmh2Rm3u/Mj2/tGpjn1+4sJIaAqFkUWUfaq4H7/FHue3qPJW9/XvtFffqdfW5Af2i+rxpguHiU3O/91Xb9F30zFZ67M++qfXJRd+39AfwOVbsrbtsVtsopJ6C+dLf1+Hra093+Crm+u+qWe3hN7ekRswdv9HaCmYfygiT/7Cq/taDwSSfFph0Qw/GvvdVBpXZ4djknAX79llt/DZq47mna3e7G0k5LIwUHpLbnvhuzQLZg/thNh71Xq++YpLW6a+7uJ1iZPstqN/AJZv/A1ZqH1S3j/RJqgXFKmFi4dfkuXPuVzuYToYdLZ0KOGkQ7dM/nMTngVQ7gf1pi3shtO5vUdi0BrgLgOgPc95B/tgfg7qz7qHnB3J44vNUGy7e1Xl56gLOsNphVuX+CaLymbRl9ccy2/z+97TfS+pXQ7q2cGoC2t+aBKxvT6TzFNVY5eQTgdHYlpDDcWe+UVyUgqrono9NMKvFTFbQMVHjwzyO69yEeuDgGZQT1FR0QNB7vm2YyJ2BQ0NodTLWMgCtcFvQ9xAoqm3+DXzhAGquXdY9V5VxeOxsQe6w25CoHo+yb6OgR4xD2kz1xtr2G09w2n7rQ/IPu/gZqdZ504smxNdU7DfjvN82dCQ08ZCgOcxg1onfogH/YaOXiAb6ozycha+yIUTFrNhuKM7s2OBLWXKUyrBZyHfH93b2OwGG+6gqoVd/QwX/ntkXROB2mgvDUEuPCy+YVVY0FJiObxDaTL9SnOIxt3QG/xPSce/dFDJToOE2DOTsL4ww0Ms7sKg8SyRQyVCExCyiu+w2CaAtIQ4JwEsZmbBKa+c7Np5gknWD52iMGibVXEBKJIaf1e4NUsEf2lpdxx0cD3Ab8vzo9B9LAMT0V+d4dZBqsVpjyWOGFMEGrwaqgFSaF6BDbCq+CwGlxCsHtB8xVbXR6K0bXGkx2bfxpblsRVUFVBrgGwpmlTyj5jsA9mbwFGTJAnFJpgIOANco4jLsg+pgZCykEIaKKVXFIrBjvfLQJsitMWIGkHrQKHjBjFRNXK5di0hzJaW6bM6EgYrzCvBGdewGJUKCbH6rDAUsHDHAYe6bAYa5DBcBpcDvQKldV92oy8A4oy4p/9Ee6XmOPOXU2PAOJgFWFZI1X0VFXU6mFwFVA2JV5knSEFE7z0z5WVVXegOvb2HpNdDyxXFYI0PeFpaiFXdInUwcnA6vcv9zriqjqJwBntEqQVJUjReSVdwuTb2dSj1zSj8mI0EffL0I9i0tyRMIu/iz9DZSYGqJLcIobcBnk9EOt8+r3zfJeZ8BZ4sOS8NIBV0E2l8wqJ1gXco+s8hAKHXQJwgMQURdW3JgDTyaVpYmvYpKVLXBHB1wDKqehuBtwA4mVmlj0s92ssJKt9MgUFjjcRYADTro/7ChwL0BxNjnYpMEa4DYxcDYHaQVkF67yaGQc5h61T+Q03Q24YrSWWOekovCCDFjgaI9/Q8phZYD7E4EzgZeKqgnIKu+MOQc6H5a0wRc3P20iFyZnNl6rJKwS+OoB0pK0nMNPKkTnznCACjwqx+qJAFfegMslodulNMWhC9TqvmNqut75L6vgEVapy6YgI0vLQ8xKXBngNOk2fxYGK5eBVwXgKgrca2O1TrjKo0kr3pjKReCixwLTj28UN9l2YQVVZqYItELvh7HjHHDo4uhic8DKw1Vldfr2gCnHjTfAEuAiimvxnE3j7bgGbQ9I04R3ZWNMtxtwo0IOklJ3mCL8swVfFHowbIr9svxXC3+NAYzALSD9FT8/GA0SfZWVNDnRkGpuXB74FNj0WtQqTdWFzXKGq5iDUXdEFVYf0IbTNKEOufKZ0beN5uI0mNsLLzt0g0FtagNuef2v5hWP0J89gkSEOjq7AZD4sjKfQi6q+WIljfPzYE4qDavUx6JMxaM7f3DX2vPjAfDkPIKrBFye1of603znuikn/w9Ku1UNRYZQYgAAAABJRU5ErkJggg==";
+const TEST_MODE = false;
+const TEST_SIG = "", TEST_STAMP = "";
+const b64ToBytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+/* ============================ Dokument-Generator (PDF) ============================ */
+const DG = (() => {
+  const {PDFDocument, StandardFonts, rgb} = PDFLib;
+  const OKCH = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
+  const san = s => String(s == null ? "" : s).replace(/[\r\n\t]+/g, " ").split("").map(ch => {
+    const c = ch.charCodeAt(0);
+    if(c >= 32 && (c <= 255 || OKCH.has(ch))) return ch;
+    const b = ch.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return (b && b.charCodeAt(0) >= 32 && b.charCodeAt(0) <= 255) ? b : "?";
+  }).join("");
+  const BLACK = rgb(0, 0, 0);
+
+  function addMin(hm, m){
+    const p = String(hm || "12:00").split(":").map(Number); let t = (p[0] || 0) * 60 + (p[1] || 0) + m;
+    t = ((t % 1440) + 1440) % 1440; return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  }
+  const endTime = (start, ue, pause) => addMin(start, Math.round(ue * 45 + (pause || 0)));
+
+  async function setup(){
+    const pdf = await PDFDocument.create();
+    const f = {r: await pdf.embedFont(StandardFonts.Helvetica), b: await pdf.embedFont(StandardFonts.HelveticaBold),
+      i: await pdf.embedFont(StandardFonts.HelveticaOblique), bi: await pdf.embedFont(StandardFonts.HelveticaBoldOblique)};
+    return {pdf, f};
+  }
+  async function images(pdf, A, d){
+    const im = {logo: await pdf.embedPng(A.logo)};
+    if(d.useSign && A.sig) im.sig = await pdf.embedPng(A.sig);
+    if(d.useSign && A.stamp) im.stamp = await pdf.embedPng(A.stamp);
+    return im;
+  }
+  const T = (pg, s, x, y, size, font, color) => pg.drawText(san(s), {x, y, size, font, color: color || BLACK});
+  const wid = (font, s, size) => font.widthOfTextAtSize(san(s), size);
+  const center = (pg, s, cx, y, size, font, color) => T(pg, s, cx - wid(font, s, size) / 2, y, size, font, color);
+  function wrap(font, s, size, maxW){
+    const words = san(s).split(" ").filter(w => w !== ""), lines = []; let cur = "";
+    words.forEach(w => { const t = cur ? cur + " " + w : w; if(!cur || wid(font, t, size) <= maxW) cur = t; else { lines.push(cur); cur = w; } });
+    if(cur) lines.push(cur); return lines.length ? lines : [""];
+  }
+  function rich(tokens, size, maxW, spaceFont){ // Textstücke mit verschiedenen Schriften umbrechen
+    const units = []; let prevEnd = true;
+    tokens.forEach(k => {
+      const s = san(k.t), lead = s.startsWith(" "), parts = s.split(" ").filter(p => p !== "");
+      parts.forEach((p, i) => {
+        if(i === 0 && units.length && !lead && !prevEnd) units[units.length - 1].parts.push({w: p, f: k.f});
+        else units.push({parts: [{w: p, f: k.f}]});
+      });
+      prevEnd = s.endsWith(" ") || s === "";
+    });
+    const sp = spaceFont.widthOfTextAtSize(" ", size), uw = u => u.parts.reduce((a, p) => a + p.f.widthOfTextAtSize(p.w, size), 0);
+    const lines = []; let cur = [], cw = 0;
+    units.forEach(u => { const w = uw(u); if(cur.length && cw + sp + w > maxW){ lines.push({units: cur, w: cw}); cur = [u]; cw = w; } else { cw += (cur.length ? sp : 0) + w; cur.push(u); } });
+    if(cur.length) lines.push({units: cur, w: cw});
+    return {lines, sp};
+  }
+  function drawRich(pg, line, sp, cx, y, size){
+    let x = cx - line.w / 2;
+    line.units.forEach((u, i) => { if(i) x += sp; u.parts.forEach(p => { pg.drawText(p.w, {x, y, size, font: p.f, color: BLACK}); x += p.f.widthOfTextAtSize(p.w, size); }); });
+  }
+  function signBlock(pg, f, im, x, yTop, dateStr, ort){
+    const sw = 118, sh = im.sig ? sw * im.sig.height / im.sig.width : 0, st = im.stamp ? 54 : 0;
+    if(im.sig) pg.drawImage(im.sig, {x, y: yTop - sh, width: sw, height: sh});
+    if(im.stamp) pg.drawImage(im.stamp, {x: x + sw + 8, y: yTop - st + 10, width: st, height: st});
+    const bottom = yTop - Math.max(sh, st - 10) - 10;
+    T(pg, ort + ", " + dateStr, x, bottom, 7.5, f.r);
+    return bottom;
+  }
+  function frame(pg, x, y, w, h, bw){ pg.drawRectangle({x, y, width: w, height: h, borderColor: BLACK, borderWidth: bw || 0.8}); }
+  function logoTR(pg, im, W, Hh, R){ const lw = 96, lh = lw * im.logo.height / im.logo.width; pg.drawImage(im.logo, {x: W - R - lw, y: Hh - 26 - lh, width: lw, height: lh}); }
+  const dayInhalt = x => x.inhalt || "";
+
+  /* ---------- Anwesenheitsliste ---------- */
+  async function anw(d, A){
+    const {pdf, f} = await setup(), im = await images(pdf, A, d);
+    const W = 841.89, Hh = 595.28, L = 51, TW = W - 2 * L;
+    const cols = [.459, .12, .105, .088, .228].map(v => v * TW), xs = [L]; cols.forEach(c => xs.push(xs[xs.length - 1] + c));
+    const green = rgb(169 / 255, 209 / 255, 142 / 255), rowH = d.days.length > 9 ? 22 : 31, headH = 36;
+    let pg, y;
+    const page = () => {
+      pg = pdf.addPage([W, Hh]); logoTR(pg, im, W, Hh, L);
+      center(pg, "Anwesenheitsliste Teilnehmer", W / 2 - 40, Hh - 75, 11, f.b);
+      const left = "Name Kurs: " + (d.kurs || ""), dx = Math.max(416, L + 4 + wid(f.b, left, 11) + 30);
+      T(pg, left, L + 4, Hh - 112, 11, f.b); T(pg, "Dozent: " + (d.dozent || ""), dx, Hh - 112, 11, f.b);
+      y = Hh - 135;
+      pg.drawRectangle({x: L, y: y - headH, width: TW, height: headH, color: green, borderColor: BLACK, borderWidth: 0.8});
+      for(let i = 1; i < 5; i++) pg.drawLine({start: {x: xs[i], y}, end: {x: xs[i], y: y - headH}, thickness: 0.8, color: BLACK});
+      const hd = [["Name Teilnehmer"], ["Entschuldigt", "gefehlt"], ["Nicht", "erschienen"], ["UE´s"], ["Datum Unterschrift"]];
+      hd.forEach((ls, i) => ls.forEach((s, k) => T(pg, s, xs[i] + 3, y - 14 - k * 13, 11, f.b)));
+      y -= headH;
+    };
+    page();
+    d.days.forEach(x => {
+      if(y - rowH < 45) page();
+      frame(pg, L, y - rowH, TW, rowH);
+      for(let i = 1; i < 5; i++) pg.drawLine({start: {x: xs[i], y}, end: {x: xs[i], y: y - rowH}, thickness: 0.8, color: BLACK});
+      const by = y - rowH / 2 - 3;
+      T(pg, d.name, xs[0] + 3, by, 8, f.b);
+      if(d.xcols){ T(pg, "x", xs[1] + 3, by, 8, f.b); T(pg, "x", xs[2] + 3, by, 8, f.b); }
+      T(pg, String(x.ue), xs[3] + 3, by, 8, f.b); T(pg, x.date + " /", xs[4] + 3, by, 8, f.b);
+      y -= rowH;
+    });
+    if(y < 130){ pg = pdf.addPage([W, Hh]); y = Hh - 60; }
+    signBlock(pg, f, im, L + 4, y - 14, d.ortDatum, d.ort);
+    pdf.setTitle("Anwesenheitsliste " + san(d.name)); pdf.setAuthor("Gründer-Elfen");
+    return pdf.save();
+  }
+
+  /* ---------- Lernfortschrittsüberwachung ---------- */
+  async function lern(d, A){
+    const {pdf, f} = await setup(), im = await images(pdf, A, d);
+    const W = 841.89, Hh = 595.28, L = 60, TW = W - 2 * L, cols = [.2, .52, .28].map(v => v * TW), xs = [L]; cols.forEach(c => xs.push(xs[xs.length - 1] + c));
+    const headH = 24; let pg, y;
+    const page = first => {
+      pg = pdf.addPage([W, Hh]); logoTR(pg, im, W, Hh, 50); y = Hh - 100;
+      if(first){
+        center(pg, "Lernfortschrittsüberwachung Schulungstage", W / 2, y, 16, f.b); y -= 42;
+        const a = "Teilnehmer: " + d.name, b = "Bildungsgutscheinnummer: " + d.gutschein, c = "Ansprechpartner Agentur: " + d.agentur;
+        const one = a + "     " + b + "     " + c;
+        if(wid(f.b, one, 11) <= TW){ T(pg, one, L, y, 11, f.b); y -= 40; }
+        else { T(pg, a + "     " + b, L, y, 11, f.b); T(pg, c, L, y - 18, 11, f.b); y -= 56; }
+      } else y = Hh - 90;
+      frame(pg, L, y - headH, TW, headH);
+      for(let i = 1; i < 3; i++) pg.drawLine({start: {x: xs[i], y}, end: {x: xs[i], y: y - headH}, thickness: 0.8, color: BLACK});
+      ["Datum/Uhrzeit", "Inhalt", "Bemerkung"].forEach((s, i) => center(pg, s, (xs[i] + xs[i + 1]) / 2, y - 16, 11, f.r));
+      y -= headH;
+    };
+    page(true);
+    d.days.forEach(x => {
+      const lines = wrap(f.r, dayInhalt(x), 9, cols[1] - 12), h = Math.max(24, lines.length * 12 + 10);
+      if(y - h < 50) page(false);
+      frame(pg, L, y - h, TW, h);
+      for(let i = 1; i < 3; i++) pg.drawLine({start: {x: xs[i], y}, end: {x: xs[i], y: y - h}, thickness: 0.8, color: BLACK});
+      T(pg, x.date + " / " + x.start + "–" + x.ende, xs[0] + 4, y - 15, 9, f.r);
+      lines.forEach((s, k) => T(pg, s, xs[1] + 5, y - 15 - k * 12, 9, f.r));
+      y -= h;
+    });
+    if(y < 130){ pg = pdf.addPage([W, Hh]); y = Hh - 60; }
+    signBlock(pg, f, im, L + 8, y - 24, d.ortDatum, d.ort);
+    pdf.setTitle("Lernfortschrittsüberwachung " + san(d.name)); pdf.setAuthor("Gründer-Elfen");
+    return pdf.save();
+  }
+
+  /* ---------- Zertifikat ---------- */
+  async function zert(d, A){
+    const {pdf, f} = await setup(), im = await images(pdf, A, d);
+    const W = 595.28, Hh = 841.89, pg = pdf.addPage([W, Hh]), cx = W / 2;
+    pg.drawRectangle({x: 70, y: 79, width: 454, height: 684, borderColor: rgb(.18, .33, .60), borderWidth: 1.5});
+    center(pg, "Zertifikat", cx, 648, 54, f.b, rgb(.75, .75, .75));
+    const lw = 150, lh = lw * im.logo.height / im.logo.width; pg.drawImage(im.logo, {x: cx - lw / 2, y: 548, width: lw, height: lh});
+    center(pg, d.name, cx, 478, 15, f.bi);
+    let y = 450; const mw = 410;
+    const r = rich([{t: "hat das Coaching ", f: f.b}, {t: "„" + d.massnahme + "“", f: f.bi}, {t: " erfolgreich abgeschlossen.", f: f.b}], 11, mw, f.b);
+    r.lines.forEach((ln, i) => { drawRich(pg, ln, r.sp, cx, y, 11); if(i < r.lines.length - 1) y -= 22; });
+    y -= 27; center(pg, "Das Coaching beinhaltet " + d.totalUE + " UE.", cx, y, 11, f.b);
+    y -= 27; center(pg, "Der Inhalt bestand aus folgenden Themengebieten:", cx, y, 11, f.b);
+    const n = d.modules.length, startY = y - 28, sp = Math.min(14, Math.max(10.5, (startY - 205) / Math.max(n, 1))), fs = Math.min(9.5, sp - 2);
+    d.modules.forEach((m, i) => {
+      const yy = startY - i * sp; T(pg, "•", 92, yy, fs, f.r); T(pg, m.name + " (" + m.ue + " UE)", 106, yy, fs, f.i);
+    });
+    const sy = startY - n * sp - 8;
+    T(pg, "Seminarort war: ", 72, sy, 11, f.i); T(pg, d.seminarort, 72 + wid(f.i, "Seminarort war: ", 11), sy, 11, f.bi);
+    const lineY = 128;
+    pg.drawLine({start: {x: 310, y: lineY}, end: {x: 505, y: lineY}, thickness: 0.8, color: BLACK});
+    center(pg, "Geschäftsführer/Ausbildungsleiterin", 410, lineY - 18, 11, f.i);
+    T(pg, d.ort + ", " + d.ortDatum, 76, lineY - 2, 11, f.i);
+    if(im.sig){ const sw = 116, sh = sw * im.sig.height / im.sig.width; pg.drawImage(im.sig, {x: 314, y: lineY + 1, width: sw, height: sh}); }
+    if(im.stamp) pg.drawImage(im.stamp, {x: 432, y: lineY - 12, width: 62, height: 62});
+    pdf.setTitle("Zertifikat " + san(d.name)); pdf.setAuthor("Gründer-Elfen");
+    return pdf.save();
+  }
+
+  return {build: (kind, d, A) => kind === "anw" ? anw(d, A) : kind === "lern" ? lern(d, A) : zert(d, A), endTime, san};
+})();
+
+/* ============================ Dokumente erstellen (Oberfläche) ============================ */
+const GEN = {assets: {logo: b64ToBytes(LOGO_B64), sig: null, stamp: null}, tab: "anw", docs: {}, t: null, seq: 0, inited: false, aerr: ""};
+const KL = {anw: "Anwesenheitsliste", lern: "Lernfortschritt", zert: "Zertifikat"};
+const PRESETS = {
+  p16: [["Persönliche Eignung & Gründungsmotivation I", 6], ["Geschäftsidee & Marktprüfung 1", 10]],
+  p100: [["Persönliche Eignung und Gründungsmotivation", 6], ["Geschäftsidee und Marktprüfung", 10], ["Gründungsarten und rechtliche Einordnung", 8],
+    ["Rechtsformen und Firmierung", 8], ["Steuern und Abgaben", 12], ["Versicherungen und Absicherung", 6], ["Geschäftsmodell und Businessplan", 20],
+    ["Finanzplanung und Wirtschaftlichkeit", 20], ["Umsetzung und Gründungsfahrplan", 10]]
+};
+const isoToday = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
+const deDate = iso => iso ? iso.split("-").reverse().join(".") : "";
+function nextWorkday(iso){
+  const d = new Date((iso || isoToday()) + "T12:00:00");
+  do { d.setDate(d.getDate() + 1); } while(d.getDay() === 0 || d.getDay() === 6);
+  const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+const G = {name: "", gutschein: "", agentur: "", massnahme: "Vor lauter Bäume den Wald sehen – dein klarer Weg zur Selbstständigkeit", kurs: "",
+  dozent: "Turabi Akünlü", seminarort: "Online-Coaching", ort: "Glandorf", datum: isoToday(), pause: 30, useSign: true,
+  modules: PRESETS.p16.map(m => ({name: m[0], ue: m[1]})),
+  days: [6, 5, 5].map(u => ({date: "", start: "12:00", ue: u, inhalt: "", manual: false}))};
+const FIELDS = {gName: "name", gGut: "gutschein", gAg: "agentur", gMass: "massnahme", gKurs: "kurs", gDoz: "dozent", gSem: "seminarort", gOrt: "ort", gDat: "datum", gPause: "pause"};
+
+function genSave(){ try{ localStorage.setItem("ge_gen", JSON.stringify(G)); }catch(e){} }
+function genLoad(){ try{ const j = JSON.parse(localStorage.getItem("ge_gen") || "null"); if(j && Array.isArray(j.days) && Array.isArray(j.modules)) Object.assign(G, j); }catch(e){} }
+
+function autoInhalt(mods, days){
+  let pos = 0, bounds = [], acc = 0; mods.forEach(m => { bounds.push({n: m.name, s: acc, e: acc + m.ue}); acc += m.ue; });
+  return days.map(d => { const s = pos, e = pos + d.ue; pos = e;
+    return bounds.filter(b => b.e > s && b.s < e && b.e > b.s).map(b => b.n).join(" / "); });
+}
+function collect(){
+  const mods = G.modules.filter(m => (m.name || "").trim()).map(m => ({name: m.name.trim(), ue: Number(m.ue) || 0}));
+  const totalUE = mods.reduce((a, m) => a + m.ue, 0);
+  const dayUE = G.days.map(x => ({ue: Number(x.ue) || 0})), auto = autoInhalt(mods, dayUE), pause = Number(G.pause) || 0;
+  const days = G.days.map((x, i) => { const st = x.start || "12:00", ue = Number(x.ue) || 0;
+    return {date: deDate(x.date) || "TT.MM.JJJJ", start: st, ue, ende: DG.endTime(st, ue, pause), inhalt: (x.manual && (x.inhalt || "").trim()) ? x.inhalt.trim() : auto[i]}; });
+  const mass = G.massnahme || "";
+  return {name: G.name || "Teilnehmername", gutschein: G.gutschein || "—", agentur: G.agentur || "—", massnahme: mass,
+    kurs: G.kurs || mass.split(/\s[–-]\s/)[0], dozent: G.dozent, seminarort: G.seminarort, ort: G.ort, ortDatum: deDate(G.datum), modules: mods, totalUE, days, useSign: G.useSign, xcols: true, auto};
+}
+function readyIssues(){
+  const out = []; if(!(G.name || "").trim()) out.push("Teilnehmername fehlt");
+  if(!(G.gutschein || "").trim()) out.push("Gutscheinnummer fehlt");
+  if(G.days.some(d => !d.date)) out.push("bei mindestens einem Tag fehlt das Datum");
+  const tm = G.modules.reduce((a, m) => a + (Number(m.ue) || 0), 0), td = G.days.reduce((a, d) => a + (Number(d.ue) || 0), 0);
+  if(tm !== td) out.push("UE passen nicht: Module " + tm + ", Tage " + td);
+  return out;
+}
+
+function fldInput(label, type, val, on, attrs){
+  const w = document.createElement("label"); w.className = "fld"; const s = document.createElement("span"); s.className = "label"; s.textContent = label;
+  const i = document.createElement("input"); i.type = type; i.value = val == null ? "" : val; Object.assign(i, attrs || {}); i.addEventListener("input", () => on(i)); w.append(s, i); return {w, i};
+}
+function renderModules(){
+  const box = $("gModules"); box.textContent = "";
+  G.modules.forEach((m, k) => {
+    const row = document.createElement("div"); row.className = "mrow";
+    const a = document.createElement("input"); a.type = "text"; a.value = m.name; a.placeholder = "Modul / Thema"; a.setAttribute("aria-label", "Modul " + (k + 1)); a.addEventListener("input", () => { m.name = a.value; changed(); });
+    const b = document.createElement("input"); b.type = "number"; b.min = "0"; b.step = "1"; b.value = m.ue; b.style.width = "82px"; b.setAttribute("aria-label", "UE Modul " + (k + 1)); b.addEventListener("input", () => { m.ue = b.value; changed(); });
+    const x = mkBtn("×", "sec", () => { G.modules.splice(k, 1); renderModules(); changed(); }); x.setAttribute("aria-label", "Modul entfernen");
+    row.append(a, b, x); box.append(row);
+  });
+}
+const dayRefs = [];
+function renderDays(){
+  const box = $("gDays"); box.textContent = ""; dayRefs.length = 0;
+  G.days.forEach((d, k) => {
+    const row = document.createElement("div"); row.className = "drow";
+    const head = document.createElement("div"); head.className = "row"; head.style.cssText = "justify-content:space-between;width:100%";
+    const t = document.createElement("strong"); t.textContent = "Tag " + (k + 1); const x = mkBtn("Entfernen", "sec", () => { G.days.splice(k, 1); renderDays(); changed(); }); head.append(t, x);
+    const f1 = fldInput("Datum", "date", d.date, i => { d.date = i.value; changed(); });
+    const f2 = fldInput("Start", "time", d.start, i => { d.start = i.value; changed(); });
+    const f3 = fldInput("UE", "number", d.ue, i => { d.ue = i.value; changed(true); }, {min: "0", step: "1"});
+    const end = document.createElement("div"); end.className = "fld"; const el = document.createElement("span"); el.className = "label"; el.textContent = "Ende"; const ev = document.createElement("div"); ev.className = "endv"; end.append(el, ev);
+    const f4 = fldInput("Inhalt (leer = automatisch)", "text", d.manual ? d.inhalt : "", i => { d.inhalt = i.value; d.manual = !!i.value.trim(); changed(); });
+    f4.w.style.flex = "1 1 100%";
+    const line = document.createElement("div"); line.className = "dline"; line.append(f1.w, f2.w, f3.w, end);
+    row.append(head, line, f4.w); box.append(row); dayRefs.push({end: ev, inh: f4.i});
+  });
+}
+function refreshDerived(){
+  const c = collect();
+  dayRefs.forEach((r, k) => { const dd = c.days[k]; if(!dd) return; r.end.textContent = dd.start + " – " + dd.ende; r.inh.placeholder = c.auto[k] || "Inhalt"; });
+  const tm = G.modules.reduce((a, m) => a + (Number(m.ue) || 0), 0), td = G.days.reduce((a, d) => a + (Number(d.ue) || 0), 0);
+  const s = $("gSum"); s.textContent = "Module: " + tm + " UE · Tage: " + td + " UE" + (tm === td ? " ✓" : " – passt nicht"); s.className = "small " + (tm === td ? "okc" : "errc");
+}
+function changed(noRerender){
+  genSave(); refreshDerived(); schedulePreview();
+}
+function distributeUE(){
+  const n = G.days.length; if(!n) return; const tot = G.modules.reduce((a, m) => a + (Number(m.ue) || 0), 0), base = Math.floor(tot / n), r = tot % n;
+  G.days.forEach((d, i) => { d.ue = base + (i < r ? 1 : 0); }); renderDays(); changed();
+}
+function setAssetStatus(){
+  const s = $("gAssetMsg"), a = GEN.assets;
+  s.textContent = "Unterschrift: " + (a.sig ? "vorhanden ✓" : "fehlt") + " · Stempel: " + (a.stamp ? "vorhanden ✓" : "fehlt") + (GEN.aerr ? " (" + GEN.aerr + ")" : "");
+  s.className = "msg " + (a.sig && a.stamp ? "ok" : "");
+}
+async function loadAssets(){
+  if(TEST_MODE){ GEN.assets.sig = b64ToBytes(TEST_SIG); GEN.assets.stamp = b64ToBytes(TEST_STAMP); setAssetStatus(); return; }
+  GEN.aerr = "";
+  for(const [k, fn] of [["sig", "signatur.png"], ["stamp", "stempel.png"]]){
+    try{
+      const r = await fetch(sbBase + "/authenticated/privat/" + fn, {headers: H()});
+      if(r.ok) GEN.assets[k] = new Uint8Array(await r.arrayBuffer());
+      else { GEN.assets[k] = null; if(r.status !== 400 && r.status !== 404) GEN.aerr = "Fehler " + r.status; }
+    }catch(e){ GEN.assets[k] = null; GEN.aerr = "Laden fehlgeschlagen"; }
+  }
+  setAssetStatus();
+}
+async function toPngBlob(file){
+  if(file.type === "image/png") return file;
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Bild nicht lesbar")); i.src = url; });
+    const cv = document.createElement("canvas"); cv.width = img.naturalWidth; cv.height = img.naturalHeight; cv.getContext("2d").drawImage(img, 0, 0);
+    return await new Promise(res => cv.toBlob(res, "image/png"));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadAsset(kind, file){
+  const m = $("gAssetMsg"); if(!file) return;
+  if(TEST_MODE){ say(m, "Im Testmodus nicht verfügbar.", "err"); return; }
+  say(m, "Lädt hoch …");
+  try{
+    const blob = await toPngBlob(file), fn = kind === "sig" ? "signatur.png" : "stempel.png";
+    const r = await fetch(sbBase + "/privat/" + fn, {method: "POST", headers: H({"Content-Type": "image/png", "x-upsert": "true"}), body: blob});
+    if(!r.ok){ let t = ""; try{ t = (await r.json()).message || ""; }catch(e){} throw new Error("Upload fehlgeschlagen (" + r.status + ") " + t); }
+    await loadAssets(); schedulePreview();
+  }catch(e){ say(m, e.message || "Fehler", "err"); }
+}
+
+function schedulePreview(){ clearTimeout(GEN.t); GEN.t = setTimeout(showPreview, 350); }
+async function showPreview(){
+  const my = ++GEN.seq, box = $("gPrev"), kind = GEN.tab;
+  try{
+    const bytes = await DG.build(kind, collect(), GEN.assets); if(my !== GEN.seq) return;
+    GEN.docs[kind] = bytes;
+    const doc = await pdfjsLib.getDocument({data: bytes.slice()}).promise; if(my !== GEN.seq) return;
+    const frag = document.createDocumentFragment(), dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.max(280, box.clientWidth - 2);
+    for(let n = 1; n <= doc.numPages; n++){
+      const p = await doc.getPage(n), v1 = p.getViewport({scale: 1}), vp = p.getViewport({scale: (w * dpr) / v1.width});
+      const cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height; cv.className = "pv";
+      await p.render({canvasContext: cv.getContext("2d"), viewport: vp}).promise; if(my !== GEN.seq) return; frag.append(cv);
+    }
+    box.textContent = ""; box.append(frag);
+  }catch(e){ if(my === GEN.seq){ box.textContent = "Vorschau nicht möglich: " + (e.message || e); } console.warn(e); }
+}
+function fname(kind){ return KL[kind] + "_" + (G.name || "Teilnehmer").replace(/[^A-Za-z0-9ÄÖÜäöüß-]+/g, "_") + ".pdf"; }
+async function genBytes(kind){ return await DG.build(kind, collect(), GEN.assets); }
+async function genDownload(){
+  const kind = GEN.tab; try{
+    const bytes = await genBytes(kind), url = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+    const a = document.createElement("a"); a.href = url; a.download = fname(kind); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }catch(e){ say($("gMsg"), "Fehler: " + (e.message || e), "err"); }
+}
+async function genUpload(){
+  const kind = GEN.tab, m = $("gMsg"), issues = readyIssues();
+  if(issues.length){ say(m, "Bitte zuerst prüfen: " + issues.join("; ") + ".", "err"); return; }
+  $("gUp").disabled = true; say(m, "Lädt hoch …");
+  try{
+    const bytes = await genBytes(kind), label = KL[kind] + " " + G.name, d = rid() + "__" + slug(label);
+    const r = await fetch(sbBase + "/" + BUCKET + "/offen/" + d + ".pdf", {method: "POST", headers: H({"Content-Type": "application/pdf"}), body: bytes});
+    if(!r.ok) throw new Error("Upload fehlgeschlagen (" + r.status + ")");
+    const box = $("gLinks"); box.hidden = false; addLinkRow(box, label, linkFor(d)); say(m, label + " ist zum Unterschreiben hochgeladen.", "ok"); renderOpen();
+  }catch(e){ say(m, e.message || "Fehler", "err"); }
+  $("gUp").disabled = false;
+}
+function setTab(k){
+  GEN.tab = k; ["anw", "lern", "zert"].forEach(x => $("gt_" + x).setAttribute("aria-pressed", x === k));
+  $("gPrev").textContent = "Vorschau wird erstellt …"; showPreview();
+}
+function genInit(){
+  if(GEN.inited) return; GEN.inited = true;
+  if(!TEST_MODE) genLoad();
+  Object.keys(FIELDS).forEach(id => { const el = $(id); el.value = G[FIELDS[id]]; el.addEventListener("input", () => { G[FIELDS[id]] = el.value; changed(); }); });
+  $("gSign").checked = !!G.useSign; $("gSign").addEventListener("change", () => { G.useSign = $("gSign").checked; changed(); });
+  $("gAddMod").onclick = () => { G.modules.push({name: "", ue: 0}); renderModules(); changed(); };
+  $("gP16").onclick = () => { G.modules = PRESETS.p16.map(m => ({name: m[0], ue: m[1]})); renderModules(); changed(); };
+  $("gP100").onclick = () => { G.modules = PRESETS.p100.map(m => ({name: m[0], ue: m[1]})); renderModules(); changed(); };
+  $("gAddDay").onclick = () => { const l = G.days[G.days.length - 1]; G.days.push({date: l && l.date ? nextWorkday(l.date) : "", start: l ? l.start : "12:00", ue: l ? l.ue : 5, inhalt: "", manual: false}); renderDays(); changed(); };
+  $("gDist").onclick = distributeUE;
+  $("gReset").onclick = () => { try{ localStorage.removeItem("ge_gen"); }catch(e){} location.reload(); };
+  ["anw", "lern", "zert"].forEach(k => { $("gt_" + k).onclick = () => setTab(k); });
+  $("gDl").onclick = genDownload; $("gUp").onclick = genUpload;
+  $("upSig").onclick = () => $("fSig").click(); $("upStamp").onclick = () => $("fStamp").click();
+  $("fSig").addEventListener("change", () => { uploadAsset("sig", $("fSig").files[0]); $("fSig").value = ""; });
+  $("fStamp").addEventListener("change", () => { uploadAsset("stamp", $("fStamp").files[0]); $("fStamp").value = ""; });
+  renderModules(); renderDays(); refreshDerived(); setAssetStatus();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+let genStarted = false;
+function genOnLogin(){ if(genStarted) return; genStarted = true; genInit(); loadAssets().then(schedulePreview); }
+function setAdminTab(k){
+  $("tabDocs").hidden = k !== "docs"; $("tabGen").hidden = k !== "gen";
+  $("tabDocsBtn").setAttribute("aria-pressed", k === "docs"); $("tabGenBtn").setAttribute("aria-pressed", k === "gen");
+  if(k === "gen") showPreview();
 }
 
 /* ============================ Start ============================ */

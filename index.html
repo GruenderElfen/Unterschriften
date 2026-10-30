@@ -161,7 +161,12 @@ input[type=date],input[type=time],input[type=number],input[type=tel]{width:100%;
           <label class="fld"><span class="label">Gutscheinnummer</span><input type="text" id="gGut" autocomplete="off" placeholder="z. B. 261D327746-1"></label>
           <label class="fld"><span class="label">Ansprechpartner Agentur</span><input type="text" id="gAg" autocomplete="off" placeholder="z. B. Frau Müller"></label>
           <label class="fld"><span class="label">Dozent</span><input type="text" id="gDoz" autocomplete="off"></label>
+          <label class="fld"><span class="label">Straße und Hausnummer (Vertrag)</span><input type="text" id="gStr" autocomplete="off" placeholder="z. B. St.-Veit-Str. 9"></label>
+          <label class="fld"><span class="label">PLZ und Ort (Vertrag)</span><input type="text" id="gPlz" autocomplete="off" placeholder="z. B. 27809 Lemwerder"></label>
+          <label class="fld"><span class="label">Maßnahmenummer / KursNet</span><input type="text" id="gKn" autocomplete="off"></label>
+          <label class="fld"><span class="label">Preis je UE in € (Vertrag)</span><input type="text" id="gRate" inputmode="decimal" autocomplete="off"></label>
         </div>
+        <label class="fld"><span class="label">Maßnahmedauer im Vertrag (leer = automatisch aus den Tagen)</span><input type="text" id="gDauer" autocomplete="off"></label>
         <label class="fld"><span class="label">Maßnahmebezeichnung (wie im AVGS)</span><input type="text" id="gMass" autocomplete="off"></label>
         <div class="g2">
           <label class="fld"><span class="label">Kursname auf Anwesenheitsliste (leer = automatisch)</span><input type="text" id="gKurs" autocomplete="off"></label>
@@ -188,7 +193,7 @@ input[type=date],input[type=time],input[type=number],input[type=tel]{width:100%;
 
       <div class="card">
         <h2>Vorschau</h2>
-        <div class="seg"><button id="gt_anw" aria-pressed="true">Anwesenheit</button><button id="gt_lern" aria-pressed="false">Lernfortschritt</button><button id="gt_zert" aria-pressed="false">Zertifikat</button></div>
+        <div class="seg"><button id="gt_anw" aria-pressed="true">Anwesenheit</button><button id="gt_lern" aria-pressed="false">Lernfortschritt</button><button id="gt_zert" aria-pressed="false">Zertifikat</button><button id="gt_vertrag" aria-pressed="false">Vertrag</button></div>
         <div id="gPrev" class="gprev muted small">Vorschau wird erstellt …</div>
         <div class="row"><button class="btn sec" id="gDl" type="button">PDF herunterladen</button><button class="btn" id="gUp" type="button">Zum Unterschreiben hochladen</button></div>
         <div class="msg" id="gMsg"></div>
@@ -688,7 +693,7 @@ function renderItems(){
     p.wrap.append(el);
   });
   renderSlotList(); hintUpdate();
-  document.querySelector(".seg").hidden = st.slots.length > 0;
+  $("mSig").parentNode.hidden = st.slots.length > 0;
   const sb = $("selbar"); sb.hidden = st.sel == null;
   document.body.style.paddingBottom = st.sel == null ? "" : "90px";
   updateCount();
@@ -1036,12 +1041,98 @@ const DG = (() => {
     return pdf.save();
   }
 
-  return {build: (kind, d, A) => kind === "anw" ? anw(d, A) : kind === "lern" ? lern(d, A) : zert(d, A), endTime, san};
+  /* ---------- Teilnehmervertrag ---------- */
+  const eur = n => n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  async function vertrag(d, A){
+    const {pdf, f} = await setup(), im = await images(pdf, A, d);
+    const W = 595.28, Hh = 841.89, L = 60, R = 60, TW = W - L - R, FS = 10.5, LH = 14.2;
+    let pg, y;
+    const page = () => { pg = pdf.addPage([W, Hh]); const lw = 96, lh = lw * im.logo.height / im.logo.width; pg.drawImage(im.logo, {x: W - R - lw, y: Hh - 30 - lh, width: lw, height: lh}); y = pdf.getPageCount() > 1 ? Hh - 100 : Hh - 60; };
+    const need = h => { if(y - h < 62) page(); };
+    const lines = (s, o) => { o = o || {}; const font = o.f || f.r, ind = o.ind || 0, fs = o.fs || FS; const ls = wrap(font, s, fs, TW - ind);
+      need(ls.length * LH); ls.forEach(t => { T(pg, t, L + ind, y - fs, fs, font); y -= LH; }); };
+    const gap = h => { y -= h; };
+    const head = s => { need(LH * 3 + 18); gap(10); T(pg, s, L, y - 11, 11.5, f.b); y -= LH + 6; };
+    const para = (s, o) => { lines(s, o); gap(4); };
+    page();
+    center(pg, "Teilnehmervertrag", W / 2 - 40, y - 12, 17, f.b); y -= 46;
+    T(pg, "Zwischen", L, y - 11, FS, f.r); y -= 26;
+    ["Gründer-Elfen", "Turabi Akünlü", "Kattenvennerstr. 6", "49219 Glandorf"].forEach(t => { T(pg, t, L, y - 11, FS, f.r); y -= LH; });
+    T(pg, "- nachfolgend Bildungsträger (BT) genannt -", W - R - wid(f.r, "- nachfolgend Bildungsträger (BT) genannt -", FS), y - 14, FS, f.r); y -= 38;
+    T(pg, "und", L, y - 11, FS, f.r); y -= 26;
+    [d.name, d.strasse, d.plzort].forEach(t => { T(pg, t || "", L, y - 11, FS, f.r); y -= LH; });
+    T(pg, "- nachfolgend Teilnehmer (TN) genannt -", W - R - wid(f.r, "- nachfolgend Teilnehmer (TN) genannt -", FS), y - 14, FS, f.r); y -= 36;
+    head("Vorbemerkung");
+    para("Wir sprechen im generischen Maskulinum von dem Bildungsträger als den Anbieter der Bildungsmaßnahmen und von dem Teilnehmer als Teilnehmendem an den Bildungsmaßnahmen jedweden Geschlechts.");
+    para("Der Teilnehmer verpflichtet sich mit diesem Vertrag, sich zu bemühen, das Ziel des Coachings zu erreichen.");
+    para("Der Teilnehmer bestätigt mit Unterschrift des Vertrages, dass er im Rahmen eines Beratungsgespräches über Umfang, Inhalt und Ablauf der Maßnahme informiert worden ist.");
+    head("§ 1 Vertragsgegenstand");
+    para("Die Vertragspartner verpflichten sich, sich zu bemühen, das Ziel des Coachings zu erreichen.");
+    para("Der Teilnehmer nimmt an der zertifizierten Lehrgangsmaßnahme des Bildungsträgers");
+    para("KursNet-Nummer (Agentur für Arbeit): " + d.kursnet, {f: f.b});
+    para("Maßnahmetitel: " + d.massnahme, {f: f.b});
+    para("Maßnahmedauer: " + d.dauer, {f: f.b});
+    lines("Inhalt Maßnahme (modulare Auflistung):", {f: f.b}); gap(2);
+    d.modules.forEach(m => lines("– " + m.name + " (" + m.ue + " UE)", {ind: 8})); gap(4);
+    para("Der Teilnehmer verpflichtet sich zur Anwesenheit und Mitwirkung (Lernpflicht).");
+    head("§ 2 Pflichten des BT");
+    para("Der Bildungsträger verpflichtet sich, den Teilnehmer zu unterrichten. Dabei sind die persönlichen Fähigkeiten und Fertigkeiten des Teilnehmers zu berücksichtigen.");
+    para("Der Bildungsträger verpflichtet sich, die zuständige Bundesagentur bzw. das Jobcenter über das Fehlen des Teilnehmers zu informieren.");
+    head("§ 3 Rechte und Pflichten des TN");
+    para("Der Teilnehmer hat am Onlinepräsenzunterricht und an den fachpraktischen Unterweisungen stets teilzunehmen. Er hat an der Erreichung des Bildungsziels eine Lern- und Mitwirkungspflicht. Für geförderte Teilnehmer gilt zugleich die Möglichkeit eines kostenlosen Rücktritts unter folgenden Bedingungen:");
+    para("(1) Kursteilnehmende sind berechtigt vor Kursbeginn vom Vertrag zurückzutreten, soweit die Teilnahme unter der Bedingung einer Kostenzusage durch einen öffentlich-rechtlichen Kostenträger (z.B. Jobcenter, Bundesagentur für Arbeit) steht und diese Kostenzusage nicht erteilt wird.");
+    para("(2) Kursteilnehmende, die durch einen öffentlich-rechtlichen Träger gefördert wurden, sind weiterhin berechtigt vom Vertrag zurückzutreten, soweit eine anderweitige Arbeitsaufnahme erfolgt. Die anderweitige Beschäftigung ist nachzuweisen.");
+    para("(3) Kündigung mit einer Frist von höchstens 6 Wochen während der Maßnahme");
+    para("Die Kündigung hat in jedem Falle schriftlich ohne Angabe von Gründen gegenüber dem Träger zu erfolgen. Ein Fernbleiben gilt in keinem Fall als Beendigung oder Kündigung.");
+    para("(4) Der Teilnehmer hat ein kostenloses Rücktrittsrecht innerhalb von 14 Tagen nach Vertragsabschluss, längstens bis zum Beginn der Maßnahme.");
+    para("Die Kündigung hat in jedem Falle schriftlich ohne Angabe von Gründen gegenüber dem Träger zu erfolgen. Ein Fernbleiben gilt in keinem Fall als Beendigung oder Kündigung.");
+    para("Die genauen Vorgänge sind mit der zuständigen Stelle zu besprechen.");
+    para("Nach Abschluss der Maßnahme erhält der Teilnehmer ein Teilnahme-Zertifikat aus dem Titel, Dauer und Inhalt der Maßnahme hervorgehen. Dies trifft auch für den Fall ein, dass der Teilnehmer die Maßnahmen vorzeitig beendet oder abbricht. Bei vorzeitigem Abbruch der Veranstaltung erhalten die Teilnehmenden eine Teilnahmebescheinigung im Umfang der erbrachten Leistungen unter Berücksichtigung der Teilnahmedauer.");
+    para("Der Teilnehmer muss ein Fernbleiben vom Coaching unverzüglich dem Bildungsträger melden. Wenn die Erreichung des Bildungsziels durch das Fernbleiben gefährdet ist, muss der Bildungsträger der zuständigen Bundesagentur/dem Jobcenter das Fehlen des Teilnehmers melden.");
+    head("§ 4 Ort der Seminar- und Übungsräume / Sorgfältiger Umgang");
+    para("(1) Der theoretische Unterricht findet an dem Seminarort statt, der im KursNet und auf der Homepage des Bildungsträgers zu dieser Maßnahme bekanntgegeben wurde. Wenn es sich bei der Maßnahme um eine Online-Maßnahme handelt, findet sie virtuell in der Online-Lernumgebung statt.");
+    para("(2) Bei offline Maßnahmen wird auf die Belange der Schulungsteilnehmer hinsichtlich Anbindung an den öffentlichen Nahverkehr Rücksicht genommen, insofern die Maßnahme oder Teile davon in Präsenz stattfinden sollten.");
+    para("(3) Sollte die Maßnahme online stattfinden, so wird der Kunde zuvor mit dem an ihn ausgehändigten Leitfaden für Online-Lernen über den Ablauf informiert.");
+    head("§ 5 Lernmittel und Unterlagen");
+    para("(1) Im Kostenbetrag sind die Kosten für Lernmittel, einschließlich der Skripten und Hand-Outs beinhaltet.");
+    need(120); head("§ 6 Kosten der Maßnahme");
+    para("(1) Die Kosten des Vollzeitlehrgangs betragen pro Teilnehmer, einschließlich der Lernmittel und der Prüfungsgebühr:");
+    need(LH * 2); center(pg, d.totalUE + " UE x " + eur(d.rate) + " € = " + eur(d.preis) + " €", W / 2, y - 12, FS + 1, f.b); y -= LH * 2;
+    head("§ 7 Ferien-, Urlaubs- und Krankheitsregelungen");
+    para("(1) Grundsätzlich ist es dem Teilnehmer verwehrt, Urlaub während der Zeit des Coachings zu nehmen, sofern das Coaching weniger als 6 Monate andauert.");
+    para("(2) Bei Verhinderung des Teilnehmers hat dieser unverzüglich den Bildungsträger zu benachrichtigen. Bei Verhinderung durch Krankheit ist unverzüglich, spätestens am 3. Tag, eine Arbeitsunfähigkeitsbescheinigung (ausgestellt ab dem 1. Tag) dem Jobcenter/der Bundesagentur zuzuleiten und eine Kopie dem Bildungsträger zukommen zu lassen.");
+    para("(3) Bei Maßnahmen mit einem Zeitraum von mehr als 6 Monaten, hat der Teilnehmer Anspruch auf 2 Urlaubstage pro Maßnahme-Monat.");
+    head("§ 8 Nebenabreden / Unwirksamkeitenregel");
+    para("(1) Nebenabreden sind nur schriftlich rechtsverbindlich.");
+    para("(2) Sollte eine der Bestimmungen des Vertrags unwirksam sein, so wird die entsprechende Klausel durch eine wirtschaftlich gleichwertige Klausel ersetzt werden. Im Übrigen bleibt der Vertrag wirksam.");
+    head("§ 9 Fehlzeitenkonzept (Unentschuldigtes Fehlen des Teilnehmers)");
+    para("(1) Ab dem ersten Tag des unentschuldigten Fehlens meldet der Träger der zuständigen Bundesagentur das Fehlen des Teilnehmers.");
+    para("(2) Teilnehmende haben an der Veranstaltung teilzunehmen und aktiv mitzuarbeiten. Störungen des Unterrichts, gleich welcher Form, sind strengstens zu unterlassen. Bei wiederholter Störung des Unterrichts können die Teilnehmenden von der weiteren Unterrichtsteilnahme ausgeschlossen werden. Eine Erstattung der Gebühren entfällt in diesen Fällen. Der öffentlich-rechtliche Träger wird über das Fehlverhalten und dessen Folgen unverzüglich informiert.");
+    head("§ 10 Datenschutz");
+    para("(1) Im Zuge der Beratung werden Daten des Auftraggebers erhoben, verarbeitet und genutzt. Die Angaben werden mit Ausnahme des Jobcenter bzw. der Agentur für Arbeit nicht an Dritte weitergegeben.");
+    head("§ 11 Versicherungsschutz");
+    lines("Versicherungsschutz während der Maßnahme", {f: f.b}); gap(2);
+    para("Der Teilnehmer ist während der Teilnahme an der Maßnahme sowie auf den direkten Wegen von und zu den Veranstaltungsorten durch die gesetzliche Unfallversicherung abgesichert. Der Versicherungsschutz wird über die zuständige Berufsgenossenschaft des Bildungsträgers gewährleistet.");
+    need(150 + 4 * LH); para("Der Teilnehmer verpflichtet sich, Unfälle oder Verletzungen, die im Zusammenhang mit der Maßnahme stehen, unverzüglich dem Bildungsträger zu melden. Dies dient der ordnungsgemäßen Bearbeitung durch die Berufsgenossenschaft sowie zur Information der zuständigen Stellen (z.B. Jobcenter oder Agentur für Arbeit).");
+    need(150); gap(18);
+    T(pg, d.ort + ", " + d.ortDatum, L, y - 11, FS, f.r); y -= 20;
+    const lineY = y - 62, x2 = W / 2 + 20;
+    if(im.sig){ const sw = 118, sh = sw * im.sig.height / im.sig.width; pg.drawImage(im.sig, {x: x2 + 4, y: lineY + 2, width: sw, height: sh}); }
+    if(im.stamp) pg.drawImage(im.stamp, {x: x2 + 130, y: lineY - 14, width: 62, height: 62});
+    pg.drawLine({start: {x: L, y: lineY}, end: {x: L + 200, y: lineY}, thickness: 0.8, color: BLACK});
+    pg.drawLine({start: {x: x2, y: lineY}, end: {x: W - R, y: lineY}, thickness: 0.8, color: BLACK});
+    T(pg, "Teilnehmer/in", L, lineY - 14, FS, f.r); T(pg, "Bildungsträger", x2, lineY - 14, FS, f.r);
+    pdf.setTitle("Teilnehmervertrag " + san(d.name)); pdf.setAuthor("Gründer-Elfen");
+    return pdf.save();
+  }
+
+  return {build: (kind, d, A) => kind === "anw" ? anw(d, A) : kind === "lern" ? lern(d, A) : kind === "vertrag" ? vertrag(d, A) : zert(d, A), endTime, san, eur};
+
 })();
 
 /* ============================ Dokumente erstellen (Oberfläche) ============================ */
 const GEN = {assets: {logo: b64ToBytes(LOGO_B64), sig: null, stamp: null}, tab: "anw", docs: {}, t: null, seq: 0, inited: false, aerr: ""};
-const KL = {anw: "Anwesenheitsliste", lern: "Lernfortschritt", zert: "Zertifikat"};
+const KL = {anw: "Anwesenheitsliste", lern: "Lernfortschritt", zert: "Zertifikat", vertrag: "Teilnehmervertrag"};
 const PRESETS = {
   p16: [["Persönliche Eignung & Gründungsmotivation I", 6], ["Geschäftsidee & Marktprüfung 1", 10]],
   p100: [["Persönliche Eignung und Gründungsmotivation", 6], ["Geschäftsidee und Marktprüfung", 10], ["Gründungsarten und rechtliche Einordnung", 8],
@@ -1056,10 +1147,10 @@ function nextWorkday(iso){
   const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 const G = {name: "", gutschein: "", agentur: "", massnahme: "Vor lauter Bäume den Wald sehen – dein klarer Weg zur Selbstständigkeit", kurs: "",
-  dozent: "Turabi Akünlü", seminarort: "Online-Coaching", ort: "Glandorf", datum: isoToday(), pause: 30, useSign: true,
+  dozent: "Turabi Akünlü", seminarort: "Online-Coaching", ort: "Glandorf", datum: isoToday(), pause: 30, useSign: true, strasse: "", plzort: "", kursnet: "264/36/26", rate: "93,90", dauer: "",
   modules: PRESETS.p16.map(m => ({name: m[0], ue: m[1]})),
   days: [6, 5, 5].map(u => ({date: "", start: "12:00", ue: u, inhalt: "", manual: false}))};
-const FIELDS = {gName: "name", gGut: "gutschein", gAg: "agentur", gMass: "massnahme", gKurs: "kurs", gDoz: "dozent", gSem: "seminarort", gOrt: "ort", gDat: "datum", gPause: "pause"};
+const FIELDS = {gName: "name", gGut: "gutschein", gAg: "agentur", gMass: "massnahme", gKurs: "kurs", gDoz: "dozent", gSem: "seminarort", gOrt: "ort", gDat: "datum", gPause: "pause", gStr: "strasse", gPlz: "plzort", gKn: "kursnet", gRate: "rate", gDauer: "dauer"};
 
 function genSave(){ try{ localStorage.setItem("ge_gen", JSON.stringify(G)); }catch(e){} }
 function genLoad(){ try{ const j = JSON.parse(localStorage.getItem("ge_gen") || "null"); if(j && Array.isArray(j.days) && Array.isArray(j.modules)) Object.assign(G, j); }catch(e){} }
@@ -1075,16 +1166,18 @@ function collect(){
   const dayUE = G.days.map(x => ({ue: Number(x.ue) || 0})), auto = autoInhalt(mods, dayUE), pause = Number(G.pause) || 0;
   const days = G.days.map((x, i) => { const st = x.start || "12:00", ue = Number(x.ue) || 0;
     return {date: deDate(x.date) || "TT.MM.JJJJ", start: st, ue, ende: DG.endTime(st, ue, pause), inhalt: (x.manual && (x.inhalt || "").trim()) ? x.inhalt.trim() : auto[i]}; });
-  const mass = G.massnahme || "";
-  return {name: G.name || "Teilnehmername", gutschein: G.gutschein || "—", agentur: G.agentur || "—", massnahme: mass,
+  const mass = G.massnahme || "", rate = Number(String(G.rate).replace(",", ".")) || 0, n = days.length;
+  const dauerAuto = n ? (n === 1 ? "1 Tag (" + days[0].date + ")" : n + " Tage (" + days[0].date + " – " + days[n - 1].date + ")") + ", " + totalUE + " UE" : totalUE + " UE";
+  return {strasse: G.strasse || "", plzort: G.plzort || "", kursnet: G.kursnet || "", rate, preis: Math.round(totalUE * rate * 100) / 100, dauer: (G.dauer || "").trim() || dauerAuto, name: G.name || "Teilnehmername", gutschein: G.gutschein || "—", agentur: G.agentur || "—", massnahme: mass,
     kurs: G.kurs || mass.split(/\s[–-]\s/)[0], dozent: G.dozent, seminarort: G.seminarort, ort: G.ort, ortDatum: deDate(G.datum), modules: mods, totalUE, days, useSign: G.useSign, xcols: true, auto};
 }
-function readyIssues(){
+function readyIssues(kind){
   const out = []; if(!(G.name || "").trim()) out.push("Teilnehmername fehlt");
   if(!(G.gutschein || "").trim()) out.push("Gutscheinnummer fehlt");
   if(G.days.some(d => !d.date)) out.push("bei mindestens einem Tag fehlt das Datum");
   const tm = G.modules.reduce((a, m) => a + (Number(m.ue) || 0), 0), td = G.days.reduce((a, d) => a + (Number(d.ue) || 0), 0);
   if(tm !== td) out.push("UE passen nicht: Module " + tm + ", Tage " + td);
+  if(kind === "vertrag" && (!(G.strasse || "").trim() || !(G.plzort || "").trim())) out.push("Straße und PLZ/Ort des Teilnehmers fehlen");
   return out;
 }
 
@@ -1195,7 +1288,7 @@ async function genDownload(){
   }catch(e){ say($("gMsg"), "Fehler: " + (e.message || e), "err"); }
 }
 async function genUpload(){
-  const kind = GEN.tab, m = $("gMsg"), issues = readyIssues();
+  const kind = GEN.tab, m = $("gMsg"), issues = readyIssues(kind);
   if(issues.length){ say(m, "Bitte zuerst prüfen: " + issues.join("; ") + ".", "err"); return; }
   $("gUp").disabled = true; say(m, "Lädt hoch …");
   try{
@@ -1207,7 +1300,7 @@ async function genUpload(){
   $("gUp").disabled = false;
 }
 function setTab(k){
-  GEN.tab = k; ["anw", "lern", "zert"].forEach(x => $("gt_" + x).setAttribute("aria-pressed", x === k));
+  GEN.tab = k; ["anw", "lern", "zert", "vertrag"].forEach(x => $("gt_" + x).setAttribute("aria-pressed", x === k));
   $("gPrev").textContent = "Vorschau wird erstellt …"; showPreview();
 }
 function genInit(){
@@ -1221,7 +1314,7 @@ function genInit(){
   $("gAddDay").onclick = () => { const l = G.days[G.days.length - 1]; G.days.push({date: l && l.date ? nextWorkday(l.date) : "", start: l ? l.start : "12:00", ue: l ? l.ue : 5, inhalt: "", manual: false}); renderDays(); changed(); };
   $("gDist").onclick = distributeUE;
   $("gReset").onclick = () => { try{ localStorage.removeItem("ge_gen"); }catch(e){} location.reload(); };
-  ["anw", "lern", "zert"].forEach(k => { $("gt_" + k).onclick = () => setTab(k); });
+  ["anw", "lern", "zert", "vertrag"].forEach(k => { $("gt_" + k).onclick = () => setTab(k); });
   $("gDl").onclick = genDownload; $("gUp").onclick = genUpload;
   $("upSig").onclick = () => $("fSig").click(); $("upStamp").onclick = () => $("fStamp").click();
   $("fSig").addEventListener("change", () => { uploadAsset("sig", $("fSig").files[0]); $("fSig").value = ""; });

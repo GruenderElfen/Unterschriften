@@ -693,7 +693,7 @@ function renderItems(){
     p.wrap.append(el);
   });
   renderSlotList(); hintUpdate();
-  $("mSig").parentNode.hidden = st.slots.length > 0;
+  $("mSig").parentNode.hidden = true;
   const sb = $("selbar"); sb.hidden = st.sel == null;
   document.body.style.paddingBottom = st.sel == null ? "" : "90px";
   updateCount();
@@ -1119,7 +1119,7 @@ const DG = (() => {
     const lineY = y - 62, x2 = W / 2 + 20;
     if(im.sig){ const sw = 118, sh = sw * im.sig.height / im.sig.width; pg.drawImage(im.sig, {x: x2 + 4, y: lineY + 2, width: sw, height: sh}); }
     if(im.stamp) pg.drawImage(im.stamp, {x: x2 + 130, y: lineY - 14, width: 62, height: 62});
-    pg.drawLine({start: {x: L, y: lineY}, end: {x: L + 200, y: lineY}, thickness: 0.8, color: BLACK});
+    T(pg, "_".repeat(34), L, lineY + 1, FS, f.r); // Textlinie: wird von der Unterschriften-Seite als Unterschriftsfeld erkannt
     pg.drawLine({start: {x: x2, y: lineY}, end: {x: W - R, y: lineY}, thickness: 0.8, color: BLACK});
     T(pg, "Teilnehmer/in", L, lineY - 14, FS, f.r); T(pg, "Bildungsträger", x2, lineY - 14, FS, f.r);
     pdf.setTitle("Teilnehmervertrag " + san(d.name)); pdf.setAuthor("Gründer-Elfen");

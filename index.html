@@ -128,7 +128,7 @@ input[type=date],input[type=time],input[type=number],input[type=tel]{width:100%;
   </form>
 
   <div id="adminBody" hidden>
-    <div class="seg" id="adminTabs"><button id="tabDocsBtn" aria-pressed="true">Dokumente</button><button id="tabGenBtn" aria-pressed="false">Erstellen</button></div>
+    <div class="seg" id="adminTabs"><button id="tabDocsBtn" aria-pressed="true">Dokumente</button><button id="tabGenBtn" aria-pressed="false">Erstellen</button><button id="tabBewBtn" aria-pressed="false">Bewertung</button></div>
     <div id="tabDocs">
     <div class="card">
       <h2>Neues Dokument zum Unterschreiben</h2>
@@ -209,6 +209,18 @@ input[type=date],input[type=time],input[type=number],input[type=tel]{width:100%;
         <input type="file" id="fSig" accept="image/*" hidden><input type="file" id="fStamp" accept="image/*" hidden>
       </div>
       <button class="btn sec" id="gReset" type="button">Eingaben zurücksetzen</button>
+    </div>
+    <div id="tabBew" hidden>
+      <div class="card">
+        <h2>Bewertungsbogen an Teilnehmer schicken</h2>
+        <p class="small muted" style="margin:0">Der Teilnehmer bewertet am Handy mit großen Knöpfen und unterschreibt mit dem Finger. Das fertige PDF kommt unter „Unterschrieben zurück“ im Reiter Dokumente an.</p>
+        <label class="fld"><span class="label">Name Teilnehmer</span><input type="text" id="bName" autocomplete="off" placeholder="z. B. Latife Demiroglu"></label>
+        <label class="fld"><span class="label">Maßnahme</span><input type="text" id="bMass" autocomplete="off" value="Gründungscoaching (AVGS)"></label>
+        <label class="fld"><span class="label">Zeitraum (freiwillig)</span><input type="text" id="bZeit" autocomplete="off" placeholder="z. B. 01.09.2026 – 31.10.2026"></label>
+        <button class="btn" id="bGo" type="button">Link erstellen</button>
+        <div class="msg" id="bMsg"></div>
+        <div id="bLinks" hidden style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
     </div>
     <button class="btn sec" id="logout">Abmelden</button>
   </div>
@@ -472,7 +484,7 @@ function initAdmin(){
   ["dragover","drop"].forEach(n => window.addEventListener(n, e => { if(!dz.contains(e.target)) e.preventDefault(); }));
   $("refOpen").onclick = renderOpen; $("refSigned").onclick = renderSigned;
   $("logout").onclick = () => { try{ localStorage.removeItem("ge_rt"); }catch(e){} token = null; $("adminBody").hidden = true; $("loginForm").hidden = false; $("pw").value = ""; };
-  $("tabDocsBtn").onclick = () => setAdminTab("docs"); $("tabGenBtn").onclick = () => setAdminTab("gen");
+  $("tabDocsBtn").onclick = () => setAdminTab("docs"); $("tabGenBtn").onclick = () => setAdminTab("gen"); $("tabBewBtn").onclick = () => setAdminTab("bew"); $("bGo").onclick = bewLink;
   if(TEST_MODE){ $("loginForm").hidden = true; $("adminBody").hidden = false; genOnLogin(); return; }
   if(!configured) say($("loginMsg"), "Supabase ist noch nicht eingetragen.", "err");
   autoLogin();
@@ -1325,9 +1337,28 @@ function genInit(){
 let genStarted = false;
 function genOnLogin(){ if(genStarted) return; genStarted = true; genInit(); loadAssets().then(schedulePreview); }
 function setAdminTab(k){
-  $("tabDocs").hidden = k !== "docs"; $("tabGen").hidden = k !== "gen";
-  $("tabDocsBtn").setAttribute("aria-pressed", k === "docs"); $("tabGenBtn").setAttribute("aria-pressed", k === "gen");
+  $("tabDocs").hidden = k !== "docs"; $("tabGen").hidden = k !== "gen"; $("tabBew").hidden = k !== "bew";
+  $("tabDocsBtn").setAttribute("aria-pressed", k === "docs"); $("tabGenBtn").setAttribute("aria-pressed", k === "gen"); $("tabBewBtn").setAttribute("aria-pressed", k === "bew");
   if(k === "gen") showPreview();
+}
+
+/* ============================ Bewertung (Link) ============================ */
+function bewLink(){
+  const n = $("bName").value.trim(), m = $("bMass").value.trim() || "Gründungscoaching (AVGS)", z = $("bZeit").value.trim();
+  if(n.length < 3){ say($("bMsg"), "Bitte den Namen eintragen.", "err"); return; }
+  const o = {n, m}; if(z) o.z = z;
+  const tok = btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  const link = location.origin + location.pathname.replace(/[^/]*$/, "") + "bewertung.html?t=" + tok;
+  const text = "Hallo " + n.split(/\s+/)[0] + ", vielen Dank für die Zusammenarbeit! Bitte bewerten Sie kurz Ihr Coaching. Das geht ganz einfach am Handy und dauert 2 Minuten: " + link;
+  const box = $("bLinks"); box.hidden = false;
+  const row = document.createElement("div"); row.className = "row"; row.style.cssText = "border-top:1px solid var(--line);padding-top:8px";
+  const t = document.createElement("div"); t.className = "small"; t.style.cssText = "flex:1 1 100%;font-weight:600"; t.textContent = "Bewertung " + n;
+  const inp = document.createElement("input"); inp.type = "text"; inp.readOnly = true; inp.value = link; inp.style.flex = "1 1 200px";
+  const cp = mkBtn("Kopieren", "", async () => { try{ await navigator.clipboard.writeText(link); cp.textContent = "Kopiert"; }catch(e){ inp.select(); } });
+  const a = (txt, href) => { const x = document.createElement("a"); x.className = "btn sm"; x.target = "_blank"; x.rel = "noopener"; x.textContent = txt; x.href = href; x.style.cssText = "text-decoration:none;display:inline-flex;align-items:center"; return x; };
+  row.append(t, inp, cp, a("WhatsApp", "https://wa.me/?text=" + encodeURIComponent(text)),
+    a("E-Mail", "mailto:?subject=" + encodeURIComponent("Kurze Bewertung Ihres Coachings") + "&body=" + encodeURIComponent(text)), a("Ansehen", link));
+  box.prepend(row); say($("bMsg"), "Link für " + n + " erstellt.", "ok"); $("bName").value = ""; $("bZeit").value = "";
 }
 
 /* ============================ Start ============================ */
